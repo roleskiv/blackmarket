@@ -25,16 +25,32 @@ export function spinReel(strip: HTMLElement, current: SymbolId[], final: SymbolI
   strip.style.display = 'block';
   if (anticipation) strip.classList.add('anticipate');
 
+  // Continuous velocity profile so the reel never jerks between phases:
+  //   wind-up → accelerate (quad in) → cruise (linear) → brake (quad out, overshooting) → settle.
+  // With quad easing a phase covering distance d in time t starts/ends at speed 2d/t,
+  // so we solve for one cruise speed v that all phases hand over at.
+  const windUp = cellPct * 0.22;
+  const overshoot = cellPct * 0.16;
+  const from = startY - windUp; // bottom of the wind-up
+  const travel = overshoot - from;
+  const main = Math.max(0.3, duration - 0.1);
+  const tAcc = Math.min(0.2, main * 0.22);
+  const tBrake = Math.min(anticipation ? 0.75 : 0.34, main * 0.4);
+  const v = travel / Math.max(0.1, main - (tAcc + tBrake) / 2);
+  const dAcc = (v * tAcc) / 2;
+  const dBrake = (v * tBrake) / 2;
+  const tCruise = Math.max(0, (travel - dAcc - dBrake) / v);
+
   const tl = gsap.timeline();
-  tl.set(strip, { yPercent: startY })
-    .to(strip, { yPercent: startY - cellPct * 0.35, duration: 0.12, ease: 'power1.out' })
-    .add(() => strip.classList.add('blur'))
-    .to(strip, { yPercent: -cellPct * 1.2, duration: Math.max(0.2, duration - 0.3), ease: 'power1.in' })
-    .add(() => strip.classList.remove('blur'))
-    .to(strip, { yPercent: 0, duration: 0.28, ease: 'back.out(2.2)' });
+  tl.set(strip, { yPercent: startY, force3D: true })
+    .to(strip, { yPercent: from, duration: 0.1, ease: 'sine.out' })
+    .to(strip, { yPercent: from + dAcc, duration: tAcc, ease: 'power2.in' })
+    .to(strip, { yPercent: overshoot - dBrake, duration: tCruise, ease: 'none' })
+    .to(strip, { yPercent: overshoot, duration: tBrake, ease: 'power2.out' })
+    .to(strip, { yPercent: 0, duration: 0.16, ease: 'sine.inOut' });
 
   return skipper.play(tl).then(() => {
-    strip.classList.remove('blur', 'anticipate');
+    strip.classList.remove('anticipate');
   });
 }
 
@@ -55,9 +71,16 @@ export function landReel(cells: (HTMLElement | null)[], heavy: boolean[]) {
       c.classList.add('cell-landed-heavy');
       setTimeout(() => c.classList.remove('cell-landed-heavy'), 700);
     } else {
-      gsap.fromTo(img, { y: -10 }, { y: 0, duration: 0.35, ease: 'bounce.out' });
+      // The strip already overshot and settled — just a soft squash so the stop feels weighty.
+      gsap.fromTo(img, { scaleY: 0.94, scaleX: 1.04, transformOrigin: '50% 100%' }, { scaleY: 1, scaleX: 1, duration: 0.3, ease: 'back.out(3)' });
     }
   });
+}
+
+/** A short downward nudge of the whole reel column when it stops. */
+export function thumpReel(reel: HTMLElement | null) {
+  if (!reel) return;
+  gsap.fromTo(reel, { y: 3 }, { y: 0, duration: 0.22, ease: 'power3.out', clearProps: 'transform' });
 }
 
 /** Reduced-motion alternative: a simple fade swap, no scrolling. */

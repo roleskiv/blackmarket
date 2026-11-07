@@ -79,7 +79,8 @@ class FxLayer {
         resizeTo: window,
         antialias: false,
         autoDensity: true,
-        resolution: Math.min(window.devicePixelRatio || 1, isSmall() ? 1.5 : 2),
+        // Soft glows don't need retina pixels; rendering the full-screen layer at 1× cuts fill cost up to 4×.
+        resolution: Math.min(window.devicePixelRatio || 1, isSmall() ? 1 : 1.25),
         preference: 'webgl',
       });
       app.canvas.style.position = 'fixed';

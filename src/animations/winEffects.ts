@@ -59,13 +59,25 @@ export async function transformCells(
 }
 
 /** Pulse winning cells and emit sparks in the symbol's glow colour. */
-export function celebrateCells(els: { el: HTMLElement | null; symbol: keyof typeof SYMBOLS }[], intensity = 1) {
-  for (const { el, symbol } of els) {
-    if (!el) continue;
+export function celebrateCells(els: { el: HTMLElement | null; symbol: keyof typeof SYMBOLS; reel?: number }[], intensity = 1) {
+  const seen = new Set<HTMLElement>();
+  for (const { el, symbol, reel = 0 } of els) {
+    if (!el || seen.has(el)) continue;
+    seen.add(el);
+    const delay = reel * 0.07; // sweep left → right like the line being read
     const img = el.querySelector('.sym-img, .sym-placeholder');
-    if (img) gsap.fromTo(img, { scale: 1 }, { scale: 1.12, duration: 0.22, yoyo: true, repeat: 3, ease: 'sine.inOut' });
-    const r = el.getBoundingClientRect();
-    fx.sparkle(r.left, r.top, r.width, r.height, SYMBOLS[symbol].glow, Math.round(5 * intensity));
+    if (img) {
+      gsap.killTweensOf(img);
+      gsap
+        .timeline({ delay })
+        .fromTo(img, { scale: 1 }, { scale: 1.2, duration: 0.14, ease: 'power2.out' })
+        .to(img, { scale: 1, duration: 0.5, ease: 'elastic.out(1, 0.4)' })
+        .to(img, { scale: 1.05, duration: 0.6, yoyo: true, repeat: 1, ease: 'sine.inOut' });
+    }
+    gsap.delayedCall(delay, () => {
+      const r = el.getBoundingClientRect();
+      fx.sparkle(r.left, r.top, r.width, r.height, SYMBOLS[symbol].glow, Math.round(5 * intensity));
+    });
   }
 }
 
@@ -76,15 +88,21 @@ export function countUp(from: number, to: number, seconds: number, onUpdate: (v:
   const tw = gsap.to(o, {
     v: to,
     duration: seconds,
-    ease: 'power1.out',
+    ease: 'power2.out',
     onUpdate: () => {
       onUpdate(Math.round(o.v));
       const now = performance.now();
-      if (now - lastTick > 90) {
+      if (now - lastTick > 85) {
         lastTick = now;
-        audio.play('coin', { volume: 0.25, rate: 0.9 + Math.random() * 0.3 });
+        // Coin ticks climb in pitch as the counter fills up.
+        const progress = to > from ? (o.v - from) / (to - from) : 1;
+        audio.play('coin', { volume: 0.22, rate: 0.85 + progress * 0.55 });
       }
     },
   });
-  return skipper.play(tw).then(() => onUpdate(to));
+  return skipper.play(tw).then(() => {
+    onUpdate(to);
+    const el = document.querySelector('.ctl-win .value');
+    if (el && to > from) gsap.fromTo(el, { scale: 1.25 }, { scale: 1, duration: 0.45, ease: 'back.out(3)', clearProps: 'transform' });
+  });
 }

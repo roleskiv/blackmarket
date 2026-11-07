@@ -262,7 +262,7 @@ export default function App() {
     setCellStates(states);
     setLines(r.lineWins.map((w) => w.line));
     celebrateCells(
-      r.lineWins.flatMap((w) => w.cells.map((c) => ({ el: g.cellEl(c.reel, c.row), symbol: w.symbol }))),
+      r.lineWins.flatMap((w) => w.cells.map((c) => ({ el: g.cellEl(c.reel, c.row), symbol: w.symbol, reel: c.reel }))),
       s.reducedMotion ? 0 : 1,
     );
     // One rising chime per winning line.

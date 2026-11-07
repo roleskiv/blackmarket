@@ -6,7 +6,7 @@ import { PAYLINES, PAYLINE_COLORS } from '../config/paylines';
 import type { Cell, CellChange, Grid, Potion } from '../engine/types';
 import { PotionIcon } from './Overlays';
 import { SymbolImage } from './SymbolImage';
-import { spinReel, landReel, fadeSwapReel, clearStrip } from '../animations/reelAnimation';
+import { spinReel, landReel, fadeSwapReel, clearStrip, thumpReel } from '../animations/reelAnimation';
 import { transformCells } from '../animations/winEffects';
 import { skipper } from '../animations/skip';
 
@@ -90,6 +90,7 @@ export const ReelGrid = forwardRef<ReelGridHandle, Props>(function ReelGrid({ in
           });
           clearStrip(strip);
           opts.onReelStop?.(reel, col);
+          thumpReel(reelRefs.current[reel] ?? null);
           landReel(
             Array.from({ length: ROWS }, (_, row) => cellRefs.current[cellKey(reel, row)]),
             col.map((s) => !!SYMBOLS[s].heavyLand),
@@ -152,14 +153,16 @@ export const ReelGrid = forwardRef<ReelGridHandle, Props>(function ReelGrid({ in
             </div>
           ))}
           <svg className="payline-overlay" viewBox="0 0 500 400" preserveAspectRatio="none">
-            {lines.map((li) => (
-              <polyline
-                key={li}
-                points={PAYLINES[li].map((row, reel) => `${reel * 100 + 50},${row * 100 + 50}`).join(' ')}
-                stroke={PAYLINE_COLORS[li]}
-                className="payline"
-              />
-            ))}
+            {lines.map((li, i) => {
+              const pts = PAYLINES[li].map((row, reel) => `${reel * 100 + 50},${row * 100 + 50}`).join(' ');
+              const delay = { animationDelay: `${Math.min(i, 8) * 0.09}s` };
+              return (
+                <g key={li} style={{ color: PAYLINE_COLORS[li] }}>
+                  <polyline points={pts} stroke={PAYLINE_COLORS[li]} className="payline-draw" pathLength={100} style={delay} />
+                  <polyline points={pts} stroke={PAYLINE_COLORS[li]} className="payline" style={delay} />
+                </g>
+              );
+            })}
           </svg>
         </div>
       </div>
