@@ -1,0 +1,23 @@
+BLACK MARKET SYMBOLS
+
+Common: spade, heart, club, diamond
+Uncommon: pocket_watch, candle_skull, plague_mask, crystal_bag
+Premium: horned_skull, bottled_creature, forbidden_grimoire, cursed_dagger
+Special: wild, scatter
+
+All assets are PNG 256x256 with alpha transparency.
+These are initial concept-art extractions and may retain small traces of the original white card background.
+public/assets/symbols/spade.png
+public/assets/symbols/heart.png
+public/assets/symbols/club.png
+public/assets/symbols/diamond.png
+public/assets/symbols/pocket_watch.png
+public/assets/symbols/candle_skull.png
+public/assets/symbols/plague_mask.png
+public/assets/symbols/crystal_bag.png
+public/assets/symbols/horned_skull.png
+public/assets/symbols/bottled_creature.png
+public/assets/symbols/forbidden_grimoire.png
+public/assets/symbols/cursed_dagger.png
+public/assets/symbols/wild.png
+public/assets/symbols/scatter.png

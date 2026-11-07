@@ -1,0 +1,130 @@
+/**
+ * Core game configuration: grid, bets, features.
+ *
+ * ⚠️ PROTOTYPE DATA — every probability and multiplier here is an
+ * uncalibrated initial value. See README "Prototype math limitations".
+ */
+import type { SymbolId } from './symbols';
+
+export const REELS = 5;
+export const ROWS = 4;
+
+/** Total-bet options in virtual demo credits. Line bet = total / 25. */
+export const BET_LEVELS = [25, 50, 100, 250, 500, 1000] as const;
+export const DEFAULT_BET_INDEX = 1;
+export const STARTING_BALANCE = 10_000;
+
+export type CrateEffectKind =
+  | 'add_wilds'
+  | 'transform_low'
+  | 'multiplier'
+  | 'expanding_wild'
+  | 'upgrade_premium';
+
+export interface CrateEffectConfig {
+  kind: CrateEffectKind;
+  title: string;
+  description: string;
+  weight: number;
+}
+
+export const FEATURE_CONFIG = {
+  /** Chance per BASE spin that a Black Market Crate activates. */
+  crateChance: 0.07,
+  /** Chance per FREE spin that a crate activates. */
+  crateChanceBonus: 0.2,
+  crateEffects: [
+    { kind: 'add_wilds',       title: 'Wild Contraband', description: 'Scatters 2–4 Wilds onto the reels.',                     weight: 30 },
+    { kind: 'transform_low',   title: 'Counterfeit Swap', description: 'Every copy of one card suit becomes one uncommon artifact.', weight: 25 },
+    { kind: 'multiplier',      title: 'Toxic Tonic',      description: 'Multiplies all line wins this spin (×2, ×3 or ×5).',      weight: 20 },
+    { kind: 'expanding_wild',  title: 'Raven Column',     description: 'One reel turns fully Wild.',                              weight: 12 },
+    { kind: 'upgrade_premium', title: 'Appraiser’s Eye',  description: 'Every copy of one uncommon artifact upgrades to a premium artifact.', weight: 13 },
+  ] satisfies CrateEffectConfig[],
+  addWildsRange: [2, 4] as [number, number],
+  multiplierValues: [
+    { value: 2, weight: 60 },
+    { value: 3, weight: 30 },
+    { value: 5, weight: 10 },
+  ],
+  /** Reels (0-based) eligible for the expanding wild. */
+  expandingWildReels: [1, 2, 3] as number[],
+
+  /** Chance per spin (base or bonus) that the Dealer's Hand intervenes, if no crate fired. */
+  dealerHandChance: 0.05,
+  /** Symbols the dealer may "deal" onto a reel, with weights. */
+  dealerHandSymbols: [
+    { symbol: 'wild' as SymbolId, weight: 15 },
+    { symbol: 'horned_skull' as SymbolId, weight: 15 },
+    { symbol: 'bottled_creature' as SymbolId, weight: 20 },
+    { symbol: 'forbidden_grimoire' as SymbolId, weight: 25 },
+    { symbol: 'cursed_dagger' as SymbolId, weight: 25 },
+  ],
+
+  /** Dealer's Vault bonus. */
+  scattersToTrigger: 3,
+  freeSpinsAwarded: { 3: 9, 4: 11, 5: 17 } as Record<number, number>,
+  retriggerSpins: 5,
+  /** Chance per free spin that a contraband artifact is collected. */
+  artifactChance: 0.4,
+  maxWildFeathers: 3,
+  maxStickyWilds: 4,
+
+  /** Black Market Crates: how many crates the Dealer offers to pick from. */
+  crateOfferCount: 3,
+
+  /** Multiplier potions: land on one random cell; line wins through that cell are multiplied. */
+  potionChance: 0.05,
+  potionChanceBonus: 0.08,
+  potionValues: [
+    { value: 2, weight: 60 },
+    { value: 3, weight: 30 },
+    { value: 5, weight: 10 },
+  ],
+
+  /**
+   * Round win cap as a multiple of the total bet (a base spin plus any bonus it
+   * triggers). Enforced by the engine — wins above it are reduced and the bonus ends.
+   */
+  maxWinX: 10_000,
+  /**
+   * Bonus buy (demo credits only): pay `priceX` × bet to open the Dealer's
+   * Vault straight away with `spins` free spins. Prices are set from
+   * simulation so a buy returns roughly the same as normal play.
+   */
+  /**
+   * Vault deal: when the vault opens, the player may trade spins for a
+   * multiplier on every free-spin win (it multiplies with Golden Ledgers).
+   * Keyed by spins awarded. Spin counts were chosen from simulation so each
+   * deal returns about the same on average (see README).
+   */
+  vaultDeals: {
+    9: [{ spins: 9, mult: 1 }, { spins: 7, mult: 2 }, { spins: 6, mult: 3 }],
+    11: [{ spins: 11, mult: 1 }, { spins: 9, mult: 2 }, { spins: 7, mult: 3 }],
+    17: [{ spins: 17, mult: 1 }, { spins: 14, mult: 2 }, { spins: 12, mult: 3 }],
+  } as Record<number, { spins: number; mult: number }[]>,
+  vaultDealNames: ['Long Haul', 'Smuggler’s Cut', 'High Stakes'],
+  bonusBuys: [
+    { id: 'vault_key', name: 'Vault Key', spins: 9, priceX: 64 },
+    { id: 'master_key', name: 'Master Key', spins: 17, priceX: 500 },
+  ] as { id: string; name: string; spins: number; priceX: number }[],
+};
+
+export type ArtifactKind = 'ledger' | 'raven_feather' | 'hourglass' | 'eye_sigil' | 'iron_shackles';
+
+export interface ArtifactConfig {
+  kind: ArtifactKind;
+  name: string;
+  description: string;
+  persistent: boolean;
+  weight: number;
+  color: string;
+}
+
+/** Collectible contraband artifacts found during the Dealer's Vault bonus. */
+export const ARTIFACTS: ArtifactConfig[] = [
+  { kind: 'ledger',        name: 'Golden Ledger',  description: '+1 to the win multiplier for the rest of the bonus.',                 persistent: true,  weight: 35, color: '#f1d58a' },
+  { kind: 'raven_feather', name: 'Raven Feather',  description: 'Adds 1 extra Wild to every remaining free spin (max 3).',             persistent: true,  weight: 30, color: '#b45cff' },
+  { kind: 'hourglass',     name: 'Stolen Hourglass', description: '+2 free spins, instantly.',                                         persistent: false, weight: 20, color: '#7dff6a' },
+  { kind: 'eye_sigil',     name: 'Eye Sigil',      description: 'One card suit is permanently upgraded to a premium artifact.',        persistent: true,  weight: 15, color: '#ff2d6f' },
+  { kind: 'iron_shackles', name: 'Iron Shackles',  description: 'Every Wild that lands from now on stays locked in place (up to 4).',  persistent: true,  weight: 5, color: '#9fb4c8' },
+];
