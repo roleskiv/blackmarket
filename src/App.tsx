@@ -24,7 +24,7 @@ import { Controls } from './components/Controls';
 import { CrateOverlay, DealerHandOverlay, PotionIcon, VaultOverlay, type CrateReveal } from './components/Overlays';
 import { ArtifactToast, BonusHud, BonusSummaryModal, artifactDef } from './components/Bonus';
 import { WinBanner, type BannerTier } from './components/WinBanner';
-import { InfoModal, SettingsPanel } from './components/Panels';
+import { BonusBuyModal, InfoModal, SettingsPanel } from './components/Panels';
 import { SymbolImage, preloadSymbols } from './components/SymbolImage';
 import { formatCredits } from './components/format';
 import { LoadingScreen } from './components/LoadingScreen';
@@ -302,6 +302,55 @@ export default function App() {
     setToast(null);
   };
 
+  // ── Vault cinematic (triggered or bought) ──────────────────────────────
+  const openVault = async (spins: number, b: BonusState) => {
+    setVaultSpins(spins);
+    await playVault(
+      {
+        overlay: vaultRef.current!,
+        stage: stageRef.current!,
+        vault: part(vaultRef.current, 'vault'),
+        keys: Array.from(vaultRef.current!.querySelectorAll('[data-part="key"]')) as HTMLElement[],
+        lock: part(vaultRef.current, 'lock'),
+        doorL: part(vaultRef.current, 'doorL'),
+        doorR: part(vaultRef.current, 'doorR'),
+        light: part(vaultRef.current, 'light'),
+        title: part(vaultRef.current, 'title'),
+      },
+      { reducedMotion: settingsRef.current.reducedMotion },
+    );
+    clearHighlights();
+    setBonus(b);
+    setBonusWin(0);
+    setWin(0);
+    audio.playMusic('bonus_music');
+  };
+
+  // ── Bonus buy: the engine debits the price and opens the vault ──────────
+  const [showBuy, setShowBuy] = useState(false);
+  const runBuy = async (tier: number) => {
+    setShowBuy(false);
+    if (busyRef.current || !engine.canBuyBonus(tier)) return;
+    audio.init();
+    setMessage(null);
+    busyRef.current = true;
+    setBusy(true);
+    skipper.reset();
+    clearHighlights();
+    const buy = engine.buyBonus(tier);
+    setBalance(buy.balanceAfter);
+    setWin(0);
+    audio.play('coin');
+    dealer.current?.react('big');
+    await skipper.wait(0.6);
+    skipper.reset();
+    await openVault(buy.spins, buy.bonus);
+    setHistoryTick((t) => t + 1);
+    busyRef.current = false;
+    setBusy(false);
+    setTimeout(() => runSpinRef.current(), 400);
+  };
+
   // ── Spin orchestration ──────────────────────────────────────────────────
   const runSpin = useCallback(async () => {
     if (cratePickResolve.current) return; // waiting for the player's crate pick
@@ -402,26 +451,7 @@ export default function App() {
       dealer.current?.react('big');
       await skipper.wait(1.0);
       skipper.reset();
-      setVaultSpins(o.bonusTriggered.spins);
-      await playVault(
-        {
-          overlay: vaultRef.current!,
-          stage: stageRef.current!,
-          vault: part(vaultRef.current, 'vault'),
-          keys: Array.from(vaultRef.current!.querySelectorAll('[data-part="key"]')) as HTMLElement[],
-          lock: part(vaultRef.current, 'lock'),
-          doorL: part(vaultRef.current, 'doorL'),
-          doorR: part(vaultRef.current, 'doorR'),
-          light: part(vaultRef.current, 'light'),
-          title: part(vaultRef.current, 'title'),
-        },
-        { reducedMotion: s.reducedMotion },
-      );
-      clearHighlights();
-      setBonus(o.bonus!);
-      setBonusWin(0);
-      setWin(0);
-      audio.playMusic('bonus_music');
+      await openVault(o.bonusTriggered.spins, o.bonus!);
     }
 
     if (o.bonusEnded) {
@@ -609,6 +639,11 @@ export default function App() {
           onAuto={startAuto}
           onStopAuto={() => setAutoRemaining(null)}
           onTurbo={() => updateSettings({ turbo: !settings.turbo })}
+          onBuy={() => {
+            audio.init();
+            audio.play('click');
+            setShowBuy(true);
+          }}
         />
       </div>
 
@@ -641,6 +676,7 @@ export default function App() {
           resetDisabled={busy || inBonus}
         />
       )}
+      {showBuy && <BonusBuyModal bet={BET_LEVELS[betIndex]} balance={balance} onBuy={runBuy} onClose={() => setShowBuy(false)} />}
       {showInfo && <InfoModal onClose={() => setShowInfo(false)} betIndex={betIndex} />}
       {!entered && <LoadingScreen progress={loadProgress} onEnter={enterMarket} />}
     </div>

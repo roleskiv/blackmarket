@@ -121,6 +121,34 @@ export class SlotEngine {
     this.history = [];
   }
 
+  /** Price of bonus buy `tier` at the current bet. */
+  bonusBuyPrice(tier: number) {
+    return FEATURE_CONFIG.bonusBuys[tier].priceX * this.bet;
+  }
+
+  canBuyBonus(tier: number) {
+    return !this.bonus && !this.inFlight && !!FEATURE_CONFIG.bonusBuys[tier] && this.wallet.canAfford(this.bonusBuyPrice(tier));
+  }
+
+  /**
+   * Bonus buy: debit the price and open the vault at the current bet.
+   * The bought bonus is one round for the win cap (10,000× the bet).
+   */
+  buyBonus(tier: number): { id: number; cost: number; spins: number; bonus: BonusState; balanceBefore: number; balanceAfter: number } {
+    if (!this.canBuyBonus(tier)) throw new Error('Cannot buy bonus');
+    const buy = FEATURE_CONFIG.bonusBuys[tier];
+    const id = ++this.spinCount;
+    const cost = this.bonusBuyPrice(tier);
+    const balanceBefore = this.wallet.balance;
+    this.wallet.debit(cost);
+    this.roundWin = 0;
+    this.roundBet = this.bet;
+    this.bonus = startBonus(this.bet, buy.spins);
+    this.history.unshift({ id, phase: 'base', bet: cost, win: 0, features: [`bonus buy:${buy.name}`] });
+    if (this.history.length > 50) this.history.pop();
+    return { id, cost, spins: buy.spins, bonus: this.bonus, balanceBefore, balanceAfter: this.wallet.balance };
+  }
+
   /** Begin a spin. Debits the bet in the base game. */
   startSpin(force: ForceOptions = {}): SpinStart {
     if (this.inFlight) throw new Error('A crate pick is pending');

@@ -1,4 +1,4 @@
-import { runSimulation, WIN_CAP_X } from '../src/engine/simulate';
+import { runBonusBuySimulation, runSimulation, WIN_CAP_X } from '../src/engine/simulate';
 
 const spins = Number(process.argv[2] ?? 1_000_000);
 const seed = Number(process.argv[3] ?? 12345);
@@ -17,3 +17,12 @@ console.log(`avg bonus win         ${r.avgBonusWin.toFixed(1)}× bet`);
 console.log(`crate / hand / potion ${pct(r.crateFrequency)} / ${pct(r.dealerHandFrequency)} / ${pct(r.potionFrequency)} of all spins`);
 console.log(`largest round win     ${r.maxWinX.toFixed(1)}× bet · rounds hitting the ${WIN_CAP_X.toLocaleString()}× cap: ${r.cappedRounds}`);
 console.log(`win distribution      ${r.distribution.map((d) => `${d.label} ${pct(d.share)}`).join(' · ')}`);
+
+const buys = Number(process.argv[4] ?? Math.max(10_000, Math.round(spins / 10)));
+console.log(`\nBonus buys (${buys.toLocaleString()} each)`);
+for (let i = 0; i < 2; i++) {
+  const b = runBonusBuySimulation(i, buys, seed + i);
+  console.log(
+    `${b.name.padEnd(11)} price ${b.priceX}× · avg ${b.avgWinX.toFixed(1)}× · RTP ${pct(b.rtp)} (95% CI ${pct(b.rtpCi95[0])} – ${pct(b.rtpCi95[1])}) · sd ${b.stdDev.toFixed(0)}× · max ${b.maxWinX.toFixed(0)}× · capped ${pct(b.cappedShare)}`,
+  );
+}

@@ -86,6 +86,15 @@ export const FEATURE_CONFIG = {
    * triggers). Enforced by the engine — wins above it are reduced and the bonus ends.
    */
   maxWinX: 10_000,
+  /**
+   * Bonus buy (demo credits only): pay `priceX` × bet to open the Dealer's
+   * Vault straight away with `spins` free spins. Prices are set from
+   * simulation so a buy returns roughly the same as normal play.
+   */
+  bonusBuys: [
+    { id: 'vault_key', name: 'Vault Key', spins: 9, priceX: 64 },
+    { id: 'master_key', name: 'Master Key', spins: 17, priceX: 500 },
+  ] as { id: string; name: string; spins: number; priceX: number }[],
 };
 
 export type ArtifactKind = 'ledger' | 'raven_feather' | 'hourglass' | 'eye_sigil' | 'iron_shackles';

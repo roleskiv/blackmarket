@@ -28,6 +28,35 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
   );
 }
 
+/* ───────────────────────── Bonus buy ───────────────────────── */
+
+export function BonusBuyModal({ bet, balance, onBuy, onClose }: { bet: number; balance: number; onBuy: (tier: number) => void; onClose: () => void }) {
+  const [chosen, setChosen] = useState<number | null>(null);
+  return (
+    <Modal title="Buy the Vault" onClose={onClose}>
+      <p className="muted">Skip the wait and open the Dealer’s Vault now at your current bet of {formatCredits(bet)}. Demo credits only.</p>
+      <div className="buy-grid">
+        {FEATURE_CONFIG.bonusBuys.map((b, i) => {
+          const price = b.priceX * bet;
+          const afford = balance >= price;
+          const confirm = chosen === i;
+          return (
+            <div key={b.id} className={`buy-card ${confirm ? 'is-chosen' : ''}`}>
+              <div className="buy-name">{b.name}</div>
+              <div className="buy-spins"><b>{b.spins}</b> free spins</div>
+              <div className="buy-price">{formatCredits(price)}<small> ({b.priceX}× bet)</small></div>
+              <button className="btn-gold" disabled={!afford} onClick={() => (confirm ? onBuy(i) : setChosen(i))}>
+                {!afford ? 'Not enough credits' : confirm ? `Confirm ${formatCredits(price)}` : 'Buy'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <p className="muted small">Prices are set from simulation so a bought bonus returns about the same on average as normal play (prototype estimate, not certified). Wins are capped at {FEATURE_CONFIG.maxWinX.toLocaleString()}× the bet.</p>
+    </Modal>
+  );
+}
+
 /* ───────────────────────── Settings ───────────────────────── */
 
 export function SettingsPanel(props: {
@@ -175,6 +204,10 @@ export function InfoModal({ onClose, betIndex }: { onClose: () => void; betIndex
           <section>
             <h3>The Dealer’s Hand</h3>
             <p>If no crate opens, the Dealer may reach in ({Math.round(FEATURE_CONFIG.dealerHandChance * 100)}% per spin). He deals one premium symbol or a Wild and points at a reel — every non-Scatter symbol on that reel becomes the dealt card. Wilds are never dealt to reel 1.</p>
+          </section>
+          <section>
+            <h3>Bonus buy</h3>
+            <p>From the base game you can pay to open the Dealer’s Vault straight away at your current bet: {FEATURE_CONFIG.bonusBuys.map((b) => `${b.name} (${b.spins} free spins, ${b.priceX}× bet)`).join(' or ')}. The bought bonus plays exactly like a triggered one. Demo credits only.</p>
           </section>
           <section>
             <h3>Multiplier potions</h3>

@@ -20,6 +20,9 @@ export const IconClose = () => (
 export const IconSpin = () => (
   <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"><path d="M38 24a14 14 0 1 1-4.1-9.9" /><path d="M36 6v9h-9" /></svg>
 );
+export const IconKey = () => (
+  <svg viewBox="0 0 24 24" {...s}><circle cx="7.5" cy="15.5" r="4.5" /><path d="m10.7 12.3 9.3-9.3" /><path d="m16 7 3 3" /><path d="m18.5 4.5 2 2" /></svg>
+);
 export const IconStop = () => (
   <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
 );

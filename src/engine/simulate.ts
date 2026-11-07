@@ -127,3 +127,48 @@ export function runSimulation(spins: number, seed = 12345): SimulationReport {
 }
 
 export const WIN_CAP_X = FEATURE_CONFIG.maxWinX;
+
+export interface BonusBuyReport {
+  tier: number;
+  name: string;
+  buys: number;
+  priceX: number;
+  avgWinX: number;
+  rtp: number;
+  rtpCi95: [number, number];
+  stdDev: number;
+  maxWinX: number;
+  cappedShare: number;
+}
+
+/** Simulate `buys` bonus buys of one tier (estimates only, like runSimulation). */
+export function runBonusBuySimulation(tier: number, buys: number, seed = 12345): BonusBuyReport {
+  const engine = new SlotEngine({ seed, balance: 2 ** 50 });
+  engine.setBetIndex(2);
+  const bet = engine.bet;
+  const { name, priceX } = FEATURE_CONFIG.bonusBuys[tier];
+  let sumX = 0;
+  let sumX2 = 0;
+  let maxX = 0;
+  let capped = 0;
+  for (let i = 0; i < buys; i++) {
+    engine.buyBonus(tier);
+    let win = 0;
+    let wasCapped = false;
+    while (engine.bonus) {
+      const o = engine.spin();
+      win += o.result.totalWin;
+      wasCapped ||= o.result.capped;
+    }
+    if (wasCapped) capped++;
+    const x = win / bet;
+    sumX += x;
+    sumX2 += x * x;
+    maxX = Math.max(maxX, x);
+  }
+  const mean = sumX / buys;
+  const sd = Math.sqrt(Math.max(0, sumX2 / buys - mean * mean));
+  const half = (1.96 * sd) / Math.sqrt(buys) / priceX;
+  const rtp = mean / priceX;
+  return { tier, name, buys, priceX, avgWinX: mean, rtp, rtpCi95: [rtp - half, rtp + half], stdDev: sd, maxWinX: maxX, cappedShare: capped / buys };
+}

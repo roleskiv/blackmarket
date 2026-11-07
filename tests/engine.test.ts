@@ -228,3 +228,37 @@ describe('simulation (100,000 spins)', () => {
     expect(r.bonusesTriggered).toBeGreaterThan(0);
   });
 });
+
+describe('bonus buy', () => {
+  it('debits the price, opens the vault at the current bet and settles like a normal bonus', () => {
+    const e = new SlotEngine({ seed: 4242, balance: 1_000_000 });
+    e.setBetIndex(2);
+    const bet = e.bet;
+    const price = FEATURE_CONFIG.bonusBuys[0].priceX * bet;
+    const buy = e.buyBonus(0);
+    expect(buy.cost).toBe(price);
+    expect(e.balance).toBe(1_000_000 - price);
+    expect(e.phase).toBe('bonus');
+    expect(e.bonus!.bet).toBe(bet);
+    expect(e.bonus!.spinsRemaining).toBe(FEATURE_CONFIG.bonusBuys[0].spins);
+    let won = 0;
+    let ended = false;
+    while (e.bonus) {
+      const o = e.spin();
+      won += o.result.totalWin;
+      if (o.bonusEnded) ended = true;
+    }
+    expect(ended).toBe(true);
+    expect(e.balance).toBe(1_000_000 - price + won);
+  });
+
+  it('refuses a buy during the bonus or without enough credits', () => {
+    const poor = new SlotEngine({ seed: 1, balance: 100 });
+    expect(poor.canBuyBonus(0)).toBe(false);
+    expect(() => poor.buyBonus(0)).toThrow();
+    const e = new SlotEngine({ seed: 1, balance: 1_000_000 });
+    e.buyBonus(1);
+    expect(e.canBuyBonus(0)).toBe(false);
+    expect(() => e.buyBonus(0)).toThrow();
+  });
+});

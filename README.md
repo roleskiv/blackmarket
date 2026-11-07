@@ -27,6 +27,7 @@ Add `?seed=<number>` to the URL to play a deterministic, replayable session.
 | **Multiplier potions** | Occasionally a potion (×2/×3/×5) lands on a cell; any line win passing through it is multiplied (potions on one line multiply together). More frequent in the bonus |
 | **Dealer’s Hand** | The Dealer deals a premium symbol or Wild and points at a reel; every non-scatter symbol on it transforms |
 | **Dealer’s Vault bonus** | Cinematic vault opening, free spins at the trigger bet, retriggers (+5), collectible contraband with persistent modifiers (Golden Ledger multiplier, Raven Feather wilds, Stolen Hourglass +2 spins, Eye Sigil suit upgrades, Iron Shackles sticky wilds up to 4), bonus summary |
+| **Bonus buy** | Key button next to Turbo: pay with demo credits to open the Dealer’s Vault at the current bet. **Vault Key**: 9 free spins for 64× bet. **Master Key**: 17 free spins for 500× bet. Two-tap confirm; not available during the bonus or auto-spin. Prices come from simulation (see below) |
 | **Win cap** | A round (base spin plus any bonus it triggers) pays at most 10,000× the bet; reaching it ends the bonus |
 | **Loading** | Loading screen preloads all symbol art with progress; “Enter the market” unlocks audio |
 | **Controls** | Bet ±, spin / slam-skip, auto-spin (10/25/50/100/∞ with stop), turbo, win counter, balance |
@@ -82,6 +83,15 @@ The supplied originals are kept untouched in `art/symbols-original/`. `scripts/c
 | Average bonus | 65.2× bet |
 | Largest observed round | 4,433× bet |
 | Rounds reaching the 10,000× cap | 0 |
+
+Bonus buys (`npm run simulate -- 1000000 2026 400000`, 400k buys each):
+
+| Buy | Price | Avg return | RTP estimate (95% range) |
+|---|---|---|---|
+| Vault Key (9 spins) | 64× | 61.6× | 96.3% (95.5–97.0%) |
+| Master Key (17 spins) | 500× | 480.9× | 96.2% (95.7–96.7%) |
+
+The Master Key is worth far more than 9→17 spins suggests because contraband (ledgers, feathers, shackles) compounds over a longer bonus. Prices live in `FEATURE_CONFIG.bonusBuys` (`src/config/game.ts`); re-run the simulation after changing them.
 
 Seed 777 gave 95.8%. The simulator also prints a win distribution, crate, hand and potion frequencies. The confidence range is wide because bonus wins are heavy-tailed; tighten it with more spins.
 
