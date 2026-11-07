@@ -8,6 +8,7 @@
  */
 import { FEATURE_CONFIG } from '../config/game';
 import { SlotEngine } from './game';
+import { createRng } from './rng';
 
 export interface SimulationReport {
   spins: number;
@@ -44,7 +45,12 @@ const BUCKETS: [string, number, number][] = [
 ];
 
 /** Simulate `spins` paid base spins (free spins are played out inside each round). */
-export function runSimulation(spins: number, seed = 12345): SimulationReport {
+/**
+ * `dealPick` decides the vault deal: 'default' always takes the full spins,
+ * 'random' picks uniformly (the reported figure), or pass a fixed index.
+ */
+export function runSimulation(spins: number, seed = 12345, dealPick: 'default' | 'random' | number = 'random'): SimulationReport {
+  const dealRng = createRng(seed ^ 0x5eed);
   const bet = 100;
   const engine = new SlotEngine({ seed, balance: 2 ** 50 });
   engine.setBetIndex(2); // 100
@@ -81,6 +87,8 @@ export function runSimulation(spins: number, seed = 12345): SimulationReport {
     let wasCapped = o.result.capped;
     if (o.bonusTriggered) {
       bonuses++;
+      const deals = engine.vaultDeals;
+      if (deals && dealPick !== 'default') engine.chooseDeal(dealPick === 'random' ? dealRng.int(deals.length) : Math.min(dealPick, deals.length - 1));
       while (engine.bonus) {
         const f = engine.spin();
         tally(f);
@@ -171,4 +179,32 @@ export function runBonusBuySimulation(tier: number, buys: number, seed = 12345):
   const half = (1.96 * sd) / Math.sqrt(buys) / priceX;
   const rtp = mean / priceX;
   return { tier, name, buys, priceX, avgWinX: mean, rtp, rtpCi95: [rtp - half, rtp + half], stdDev: sd, maxWinX: maxX, cappedShare: capped / buys };
+}
+
+/** Average bonus win (× bet) for every vault deal at each awarded-spins level. */
+export function runVaultDealSimulation(bonuses: number, seed = 12345) {
+  const out: { awarded: number; deal: number; spins: number; mult: number; avgWinX: number; ci95: number }[] = [];
+  for (const [awardedKey, deals] of Object.entries(FEATURE_CONFIG.vaultDeals)) {
+    const awarded = Number(awardedKey);
+    deals.forEach((d, i) => {
+      const engine = new SlotEngine({ seed: seed + awarded * 10 + i, balance: 2 ** 50 });
+      engine.setBetIndex(2);
+      const bet = engine.bet;
+      const tier = FEATURE_CONFIG.bonusBuys.findIndex((b) => b.spins === awarded);
+      let sum = 0;
+      let sum2 = 0;
+      for (let n = 0; n < bonuses; n++) {
+        if (tier >= 0) engine.buyBonus(tier);
+        else engine.forceBonus(awarded);
+        engine.chooseDeal(i);
+        let w = 0;
+        while (engine.bonus) w += engine.spin().result.totalWin;
+        sum += w / bet;
+        sum2 += (w / bet) ** 2;
+      }
+      const m = sum / bonuses;
+      out.push({ awarded, deal: i, spins: d.spins, mult: d.mult, avgWinX: m, ci95: (1.96 * Math.sqrt(Math.max(0, sum2 / bonuses - m * m))) / Math.sqrt(bonuses) });
+    });
+  }
+  return out;
 }

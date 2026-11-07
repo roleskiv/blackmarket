@@ -64,11 +64,12 @@ export function SettingsPanel(props: {
   update: (p: Partial<Settings>) => void;
   onClose: () => void;
   onReset: () => void;
+  onResetTips: () => void;
   history: HistoryEntry[];
   resetDisabled: boolean;
 }) {
   const { settings: s, update } = props;
-  const Toggle = ({ k, label, hint }: { k: 'sound' | 'turbo' | 'reducedMotion' | 'showHistory'; label: string; hint?: string }) => (
+  const Toggle = ({ k, label, hint }: { k: 'sound' | 'turbo' | 'reducedMotion' | 'showHistory' | 'showTips'; label: string; hint?: string }) => (
     <label className="setting-row">
       <span>
         {label}
@@ -93,6 +94,8 @@ export function SettingsPanel(props: {
       <Toggle k="turbo" label="Turbo spin" hint="Faster reels and shorter sequences" />
       <Toggle k="reducedMotion" label="Reduced motion" hint="No scrolling reels, shaking or particles" />
       <Toggle k="showHistory" label="Show spin history" />
+      <Toggle k="showTips" label="First-time tips" hint="Explain each feature the first time it appears" />
+      <button className="link-btn" onClick={props.onResetTips}>Show all tips again</button>
       <p className="setting-note">Tap the reels, the spin button or press Space to skip long animations. Skipping never changes an outcome — every result is resolved and paid before it is animated.</p>
       <button className="btn-danger" onClick={props.onReset} disabled={props.resetDisabled}>
         Reset demo balance
@@ -204,6 +207,10 @@ export function InfoModal({ onClose, betIndex }: { onClose: () => void; betIndex
           <section>
             <h3>The Dealer’s Hand</h3>
             <p>If no crate opens, the Dealer may reach in ({Math.round(FEATURE_CONFIG.dealerHandChance * 100)}% per spin). He deals one premium symbol or a Wild and points at a reel — every non-Scatter symbol on that reel becomes the dealt card. Wilds are never dealt to reel 1.</p>
+          </section>
+          <section>
+            <h3>The Dealer’s deal</h3>
+            <p>When the vault opens you choose how to take it: {FEATURE_CONFIG.vaultDealNames.map((n, i) => `${n} (${FEATURE_CONFIG.vaultDeals[9][i].spins} spins ×${FEATURE_CONFIG.vaultDeals[9][i].mult})`).join(', ')} for a 9-spin vault, with matching trades for 11 and 17 spins. The deal multiplier multiplies every free-spin win and stacks with Golden Ledgers. Each deal returns about the same on average (simulation estimate). If you don’t choose within 12 seconds, or during auto-spin, you get the full spins.</p>
           </section>
           <section>
             <h3>Bonus buy</h3>

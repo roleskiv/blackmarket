@@ -91,6 +91,18 @@ export const FEATURE_CONFIG = {
    * Vault straight away with `spins` free spins. Prices are set from
    * simulation so a buy returns roughly the same as normal play.
    */
+  /**
+   * Vault deal: when the vault opens, the player may trade spins for a
+   * multiplier on every free-spin win (it multiplies with Golden Ledgers).
+   * Keyed by spins awarded. Spin counts were chosen from simulation so each
+   * deal returns about the same on average (see README).
+   */
+  vaultDeals: {
+    9: [{ spins: 9, mult: 1 }, { spins: 7, mult: 2 }, { spins: 6, mult: 3 }],
+    11: [{ spins: 11, mult: 1 }, { spins: 9, mult: 2 }, { spins: 7, mult: 3 }],
+    17: [{ spins: 17, mult: 1 }, { spins: 14, mult: 2 }, { spins: 12, mult: 3 }],
+  } as Record<number, { spins: number; mult: number }[]>,
+  vaultDealNames: ['Long Haul', 'Smuggler’s Cut', 'High Stakes'],
   bonusBuys: [
     { id: 'vault_key', name: 'Vault Key', spins: 9, priceX: 64 },
     { id: 'master_key', name: 'Master Key', spins: 17, priceX: 500 },

@@ -51,6 +51,17 @@ class AudioManager {
     } catch {
       /* audio unavailable — stay silent */
     }
+    // Mobile Safari suspends (or "interrupts") the audio context when the tab is
+    // hidden or a call comes in; pause while hidden and resume on return / next touch.
+    const resume = () => {
+      const ctx = Howler.ctx;
+      if (ctx && ctx.state !== 'running' && document.visibilityState === 'visible') ctx.resume().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') Howler.ctx?.suspend().catch(() => {});
+      else resume();
+    });
+    window.addEventListener('pointerdown', resume, { passive: true });
     if (this.current) {
       const m = this.current;
       this.current = null;

@@ -262,3 +262,26 @@ describe('bonus buy', () => {
     expect(() => e.buyBonus(0)).toThrow();
   });
 });
+
+describe('vault deal', () => {
+  it('offers deals when the vault opens and applies the chosen spins and multiplier', () => {
+    const e = new SlotEngine({ seed: 77, balance: 1_000_000 });
+    e.buyBonus(0);
+    const deals = e.vaultDeals!;
+    expect(deals.map((d) => d.spins)).toEqual(FEATURE_CONFIG.vaultDeals[9].map((d) => d.spins));
+    const b = e.chooseDeal(2);
+    expect(b.spinsRemaining).toBe(deals[2].spins);
+    expect(b.dealMultiplier).toBe(deals[2].mult);
+    expect(e.vaultDeals).toBeNull();
+    const o = e.spin();
+    expect(o.result.multiplier % deals[2].mult).toBe(0);
+  });
+
+  it('locks the deal once the first free spin starts', () => {
+    const e = new SlotEngine({ seed: 78, balance: 1_000_000 });
+    e.buyBonus(0);
+    e.spin();
+    expect(e.vaultDeals).toBeNull();
+    expect(() => e.chooseDeal(1)).toThrow();
+  });
+});

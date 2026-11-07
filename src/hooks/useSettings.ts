@@ -8,6 +8,7 @@ export interface Settings {
   turbo: boolean;
   reducedMotion: boolean;
   showHistory: boolean;
+  showTips: boolean;
 }
 
 const KEY = 'black-market:settings:v1';
@@ -22,6 +23,7 @@ export const DEFAULT_SETTINGS: Settings = {
   turbo: false,
   reducedMotion: false,
   showHistory: true,
+  showTips: true,
 };
 
 function load(): Settings {

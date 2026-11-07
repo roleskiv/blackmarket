@@ -39,7 +39,7 @@ export function BonusHud({ bonus, bonusWin }: { bonus: BonusState; bonusWin: num
         </div>
         <div className="bonus-stat">
           <span className="label">Multiplier</span>
-          <span className="value gold">×{1 + bonus.ledgers}</span>
+          <span className="value gold">×{(1 + bonus.ledgers) * (bonus.dealMultiplier ?? 1)}</span>
         </div>
         <div className="bonus-stat">
           <span className="label">Bonus win</span>

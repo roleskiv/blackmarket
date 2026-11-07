@@ -27,6 +27,7 @@ Add `?seed=<number>` to the URL to play a deterministic, replayable session.
 | **Multiplier potions** | Occasionally a potion (×2/×3/×5) lands on a cell; any line win passing through it is multiplied (potions on one line multiply together). More frequent in the bonus |
 | **Dealer’s Hand** | The Dealer deals a premium symbol or Wild and points at a reel; every non-scatter symbol on it transforms |
 | **Dealer’s Vault bonus** | Cinematic vault opening, free spins at the trigger bet, retriggers (+5), collectible contraband with persistent modifiers (Golden Ledger multiplier, Raven Feather wilds, Stolen Hourglass +2 spins, Eye Sigil suit upgrades, Iron Shackles sticky wilds up to 4), bonus summary |
+| **Dealer’s deal** | When the vault opens, choose Long Haul (all spins, ×1), Smuggler’s Cut (fewer spins, ×2 on every free-spin win) or High Stakes (fewest spins, ×3). For 9/11/17 awarded spins the trades are 9/7/6, 11/9/7 and 17/14/12 spins. The deal multiplier multiplies with Golden Ledgers. Auto-spin and the 12 s timeout take Long Haul |
 | **Bonus buy** | Key button next to Turbo: pay with demo credits to open the Dealer’s Vault at the current bet. **Vault Key**: 9 free spins for 64× bet. **Master Key**: 17 free spins for 500× bet. Two-tap confirm; not available during the bonus or auto-spin. Prices come from simulation (see below) |
 | **Win cap** | A round (base spin plus any bonus it triggers) pays at most 10,000× the bet; reaching it ends the bonus |
 | **Loading** | Loading screen preloads all symbol art with progress; “Enter the market” unlocks audio |
@@ -92,6 +93,8 @@ Bonus buys (`npm run simulate -- 1000000 2026 400000`, 400k buys each):
 | Master Key (17 spins) | 500× | 480.9× | 96.2% (95.7–96.7%) |
 
 The Master Key is worth far more than 9→17 spins suggests because contraband (ledgers, feathers, shackles) compounds over a longer bonus. Prices live in `FEATURE_CONFIG.bonusBuys` (`src/config/game.ts`); re-run the simulation after changing them.
+
+Vault deals are picked at random in the figure above. Over 2M spins the RTP was 96.1% always taking Long Haul, 96.3% always Smuggler’s Cut and 94.7% always High Stakes (each ±1.9%). Per-deal averages are printed by the simulator; spin counts can only move in whole spins, so some deals sit a few percent above or below the others.
 
 Seed 777 gave 95.8%. The simulator also prints a win distribution, crate, hand and potion frequencies. The confidence range is wide because bonus wins are heavy-tailed; tighten it with more spins.
 

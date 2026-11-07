@@ -85,6 +85,8 @@ export class SlotEngine {
   /** Running win of the current round (base spin + its bonus), for the win cap. */
   private roundWin = 0;
   private roundBet = 0;
+  /** Deals on offer for a bonus that hasn't played its first spin yet. */
+  private dealOffer: { spins: number; mult: number }[] | null = null;
 
   constructor(opts: EngineOptions = {}) {
     this.rng = createRng(opts.seed ?? randomSeed());
@@ -100,6 +102,28 @@ export class SlotEngine {
   get balance() {
     return this.wallet.balance;
   }
+  /** Vault deals the player may still choose from (null once the first free spin starts). */
+  get vaultDeals() {
+    return this.dealOffer;
+  }
+
+  /** Choose vault deal `i` before the first free spin. Deal 0 is the default. */
+  chooseDeal(i: number): BonusState {
+    const deal = this.dealOffer?.[i];
+    if (!this.bonus || !deal) throw new Error('No vault deal to choose');
+    this.bonus = startBonus(this.bonus.bet, deal.spins, deal.mult);
+    this.dealOffer = null;
+    return this.bonus;
+  }
+
+  private openVault(bet: number, spins: number) {
+    const deals = FEATURE_CONFIG.vaultDeals[spins];
+    this.dealOffer = deals ? deals.map((d) => ({ ...d })) : null;
+    const b = startBonus(bet, spins);
+    this.bonus = b;
+    return b;
+  }
+
   get awaitingCratePick() {
     return !!this.inFlight;
   }
@@ -118,6 +142,7 @@ export class SlotEngine {
     if (this.inFlight) throw new Error('Cannot reset during a spin');
     this.wallet.reset(amount);
     this.bonus = null;
+    this.dealOffer = null;
     this.history = [];
   }
 
@@ -143,10 +168,18 @@ export class SlotEngine {
     this.wallet.debit(cost);
     this.roundWin = 0;
     this.roundBet = this.bet;
-    this.bonus = startBonus(this.bet, buy.spins);
+    const bonus = this.openVault(this.bet, buy.spins);
     this.history.unshift({ id, phase: 'base', bet: cost, win: 0, features: [`bonus buy:${buy.name}`] });
     if (this.history.length > 50) this.history.pop();
-    return { id, cost, spins: buy.spins, bonus: this.bonus, balanceBefore, balanceAfter: this.wallet.balance };
+    return { id, cost, spins: buy.spins, bonus, balanceBefore, balanceAfter: this.wallet.balance };
+  }
+
+  /** QA / simulation: open the vault for free at the current bet with `spins` awarded. */
+  forceBonus(spins: number) {
+    if (this.bonus || this.inFlight) throw new Error('Cannot force bonus now');
+    this.roundWin = 0;
+    this.roundBet = this.bet;
+    return this.openVault(this.bet, spins);
   }
 
   /** Begin a spin. Debits the bet in the base game. */
@@ -154,6 +187,7 @@ export class SlotEngine {
     if (this.inFlight) throw new Error('A crate pick is pending');
     if (!this.canSpin()) throw new Error('Cannot spin');
     const id = ++this.spinCount;
+    if (this.bonus) this.dealOffer = null; // first free spin locks in the deal
     const seedState = this.rng.state;
     const balanceBefore = this.wallet.balance;
     const phase = this.phase;
@@ -210,9 +244,8 @@ export class SlotEngine {
 
     if (f.phase === 'base') {
       if (result.freeSpinsAwarded > 0) {
-        this.bonus = startBonus(result.bet, result.freeSpinsAwarded);
+        outcome.bonus = this.openVault(result.bet, result.freeSpinsAwarded);
         outcome.bonusTriggered = { spins: result.freeSpinsAwarded, scatters: result.scatter.count };
-        outcome.bonus = this.bonus;
       }
     } else {
       let b = this.bonus!;

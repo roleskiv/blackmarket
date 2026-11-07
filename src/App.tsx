@@ -25,6 +25,8 @@ import { CrateOverlay, DealerHandOverlay, PotionIcon, VaultOverlay, type CrateRe
 import { ArtifactToast, BonusHud, BonusSummaryModal, artifactDef } from './components/Bonus';
 import { WinBanner, type BannerTier } from './components/WinBanner';
 import { BonusBuyModal, InfoModal, SettingsPanel } from './components/Panels';
+import { VaultDealOverlay } from './components/VaultDeal';
+import { claimTip, resetTips, TipCard, type TipId } from './components/Tips';
 import { SymbolImage, preloadSymbols } from './components/SymbolImage';
 import { formatCredits } from './components/format';
 import { LoadingScreen } from './components/LoadingScreen';
@@ -125,6 +127,7 @@ export default function App() {
     audio.playMusic('ambience');
     audio.play('transition', { volume: 0.6 });
     setEntered(true);
+    setTimeout(() => showTip('welcome'), 900);
   };
 
   useEffect(() => {
@@ -172,6 +175,38 @@ export default function App() {
     return () => clearInterval(id);
   }, [crateChoosing]);
 
+  // ── Vault deal: trade spins for a multiplier before the first free spin ──
+  const [dealOffer, setDealOffer] = useState<{ spins: number; mult: number }[] | null>(null);
+  const [dealCountdown, setDealCountdown] = useState<number | null>(null);
+  const dealResolve = useRef<((i: number) => void) | null>(null);
+  useEffect(() => {
+    if (!dealOffer) return;
+    let left = 12;
+    setDealCountdown(left);
+    const id = setInterval(() => {
+      left -= 1;
+      setDealCountdown(left);
+      if (left <= 0) dealResolve.current?.(0);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [dealOffer]);
+  const chooseDeal = async (): Promise<BonusState | null> => {
+    const deals = engine.vaultDeals;
+    if (!deals) return null;
+    let pick = 0;
+    if (autoRef.current === null) {
+      dealer.current?.lean();
+      setDealOffer(deals);
+      pick = await new Promise<number>((resolve) => (dealResolve.current = resolve));
+      dealResolve.current = null;
+      setDealOffer(null);
+      setDealCountdown(null);
+      dealer.current?.settle();
+      audio.play(pick === 0 ? 'click' : 'potion');
+    }
+    return engine.chooseDeal(pick);
+  };
+
   /** Show the three crates, wait for the player's pick, then settle the spin in the engine. */
   const chooseCrate = async (): Promise<SpinOutcome> => {
     const s = settingsRef.current;
@@ -179,6 +214,7 @@ export default function App() {
     setCratePassed([null, null, null]);
     dealer.current?.lean();
     dealer.current?.eyeFlare(1);
+    showTip('crate');
     await introCrates(crateRef.current!, { reducedMotion: s.reducedMotion });
     let pick: number;
     if (autoRef.current !== null) {
@@ -205,6 +241,14 @@ export default function App() {
     return o;
   };
 
+  // ── First-time tips (never during auto-spin) ────────────────────────────
+  const [tip, setTip] = useState<TipId | null>(null);
+  const closeTip = useCallback(() => setTip(null), []);
+  const showTip = (id: TipId) => {
+    if (autoRef.current !== null || !settingsRef.current.showTips) return;
+    if (claimTip(id)) setTip(id);
+  };
+
   // ── Feature presentation ────────────────────────────────────────────────
   const playStep = async (step: FeatureStep) => {
     const s = settingsRef.current;
@@ -220,6 +264,7 @@ export default function App() {
         await g.applyChanges(step.changes, step.effect === 'add_wilds' || step.effect === 'expanding_wild' ? 'wild' : 'magic');
       }
     } else if (step.type === 'dealer_hand') {
+      showTip('hand');
       setHandSymbol(step.symbol);
       await new Promise((r) => requestAnimationFrame(r));
       const finish = await playDealerHand(
@@ -236,9 +281,11 @@ export default function App() {
     } else if (step.type === 'raven_feather') {
       await g.applyChanges(step.changes, 'wild');
     } else if (step.type === 'sticky_wilds') {
+      showTip('sticky');
       audio.play('wild_land', { volume: 0.5 });
       await g.applyChanges(step.changes, 'wild');
     } else if (step.type === 'potion') {
+      showTip('potion');
       audio.play('potion');
       setPotions((p) => [...p, { cell: step.cell, value: step.value }]);
       const el = g.cellEl(step.cell.reel, step.cell.row);
@@ -320,7 +367,9 @@ export default function App() {
       { reducedMotion: settingsRef.current.reducedMotion },
     );
     clearHighlights();
+    b = (await chooseDeal()) ?? b;
     setBonus(b);
+    showTip('vault');
     setBonusWin(0);
     setWin(0);
     audio.playMusic('bonus_music');
@@ -408,6 +457,7 @@ export default function App() {
           // Tease: two keys are in — the Dealer leans in while the last reels spin.
           if (Object.keys(teaseCells).length === 2 && i < 4) {
             audio.play('tease');
+            showTip('tease');
             dealer.current?.lean();
             dealer.current?.eyeFlare(1.4);
           }
@@ -663,7 +713,7 @@ export default function App() {
           <ArtifactToast kind={toast.kind} detail={toast.kind === 'eye_sigil' && toast.from && toast.to ? `Every ${SYMBOLS[toast.from].name} now lands as a ${SYMBOLS[toast.to].name}.` : undefined} />
         </div>
       )}
-      {(busy || banner) && <button className="skip-btn" onClick={() => skipper.skip()}>Skip ▸▸</button>}
+      {(busy || banner) && !dealOffer && <button className="skip-btn" onClick={() => skipper.skip()}>Skip ▸▸</button>}
       {summary && <BonusSummaryModal summary={summary} onClose={() => summaryResolve.current?.()} />}
       {showSettings && (
         <SettingsPanel
@@ -672,10 +722,16 @@ export default function App() {
           update={updateSettings}
           onClose={() => setShowSettings(false)}
           onReset={resetBalance}
+          onResetTips={() => {
+            resetTips();
+            updateSettings({ showTips: true });
+          }}
           history={engine.history}
           resetDisabled={busy || inBonus}
         />
       )}
+      {tip && <TipCard id={tip} onClose={closeTip} />}
+      {dealOffer && <VaultDealOverlay deals={dealOffer} countdown={dealCountdown} onPick={(i) => dealResolve.current?.(i)} />}
       {showBuy && <BonusBuyModal bet={BET_LEVELS[betIndex]} balance={balance} onBuy={runBuy} onClose={() => setShowBuy(false)} />}
       {showInfo && <InfoModal onClose={() => setShowInfo(false)} betIndex={betIndex} />}
       {!entered && <LoadingScreen progress={loadProgress} onEnter={enterMarket} />}

@@ -16,6 +16,8 @@ export interface BonusState {
   totalWin: number;
   /** Persistent modifiers. */
   ledgers: number;
+  /** Multiplier from the vault deal the player chose (multiplies with ledgers). */
+  dealMultiplier: number;
   feathers: number;
   sigils: { from: SymbolId; to: SymbolId }[];
   /** Iron Shackles collected: wilds that land become sticky. */
@@ -42,7 +44,7 @@ export function freeSpinsFor(scatters: number): number {
   return FEATURE_CONFIG.freeSpinsAwarded[Math.min(scatters, 5)] ?? 0;
 }
 
-export function startBonus(bet: number, spins: number): BonusState {
+export function startBonus(bet: number, spins: number, dealMultiplier = 1): BonusState {
   return {
     bet,
     spinsAwarded: spins,
@@ -50,6 +52,7 @@ export function startBonus(bet: number, spins: number): BonusState {
     spinsPlayed: 0,
     totalWin: 0,
     ledgers: 0,
+    dealMultiplier,
     feathers: 0,
     sigils: [],
     sticky: false,
@@ -59,7 +62,7 @@ export function startBonus(bet: number, spins: number): BonusState {
   };
 }
 
-export const bonusMultiplier = (b: BonusState) => 1 + b.ledgers;
+export const bonusMultiplier = (b: BonusState) => (1 + b.ledgers) * (b.dealMultiplier ?? 1);
 
 /**
  * Roll for a contraband artifact. Rules:
