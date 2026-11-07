@@ -3,7 +3,8 @@ import { flushSync } from 'react-dom';
 import { REELS, ROWS } from '../config/game';
 import { SYMBOLS, type SymbolId } from '../config/symbols';
 import { PAYLINES, PAYLINE_COLORS } from '../config/paylines';
-import type { CellChange, Grid } from '../engine/types';
+import type { Cell, CellChange, Grid, Potion } from '../engine/types';
+import { PotionIcon } from './Overlays';
 import { SymbolImage } from './SymbolImage';
 import { spinReel, landReel, fadeSwapReel, clearStrip } from '../animations/reelAnimation';
 import { transformCells } from '../animations/winEffects';
@@ -34,11 +35,13 @@ interface Props {
   lines: number[];
   spinning: boolean;
   bonus: boolean;
+  potions: Potion[];
+  stickyCells: Cell[];
 }
 
 export const cellKey = (reel: number, row: number) => `${reel}-${row}`;
 
-export const ReelGrid = forwardRef<ReelGridHandle, Props>(function ReelGrid({ initial, cellStates, lines, spinning, bonus }, ref) {
+export const ReelGrid = forwardRef<ReelGridHandle, Props>(function ReelGrid({ initial, cellStates, lines, spinning, bonus, potions, stickyCells }, ref) {
   const [grid, setGrid] = useState<Grid>(initial);
   const gridRef = useRef(grid);
   gridRef.current = grid;
@@ -124,15 +127,23 @@ export const ReelGrid = forwardRef<ReelGridHandle, Props>(function ReelGrid({ in
               <div className={`reel-static ${spinningReels[reel] ? 'is-hidden' : ''}`}>
                 {col.map((id, row) => {
                   const st = cellStates[cellKey(reel, row)];
+                  const potion = potions.find((p) => p.cell.reel === reel && p.cell.row === row);
+                  const sticky = stickyCells.some((c) => c.reel === reel && c.row === row);
                   return (
                     <div
                       key={row}
                       ref={(el) => (cellRefs.current[cellKey(reel, row)] = el)}
-                      className={`cell rarity-${SYMBOLS[id].rarity} ${st ? `cell-${st}` : ''} sym-${id}`}
+                      className={`cell rarity-${SYMBOLS[id].rarity} ${st ? `cell-${st}` : ''} sym-${id} ${sticky ? 'is-sticky' : ''}`}
                       style={{ ['--glow' as string]: SYMBOLS[id].glow }}
                     >
                       <div className="cell-glow" />
                       <SymbolImage id={id} />
+                      {potion && (
+                        <div className="cell-potion">
+                          <PotionIcon value={potion.value} small />
+                        </div>
+                      )}
+                      {sticky && <div className="cell-shackle" title="Locked by Iron Shackles" />}
                     </div>
                   );
                 })}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SlotEngine, Wallet, InsufficientCreditsError, gridFromRows, applyArtifact, startBonus, createRng, rollArtifact } from '../src/engine';
+import { SlotEngine, Wallet, InsufficientCreditsError, gridFromRows, applyArtifact, startBonus, createRng, rollArtifact, lockStickyWilds } from '../src/engine';
 import { runSimulation } from '../src/engine/simulate';
 import { FEATURE_CONFIG } from '../src/config/game';
 import type { SymbolId } from '../src/config/symbols';
@@ -130,6 +130,68 @@ describe('scatter trigger & bonus state transitions', () => {
     b.feathers = FEATURE_CONFIG.maxWildFeathers;
     const rng = createRng(1);
     for (let i = 0; i < 300; i++) expect(rollArtifact(rng, b)?.kind).not.toBe('raven_feather');
+  });
+});
+
+describe('two-step spins (crate pick)', () => {
+  it('debits on start, credits on pick, and blocks other spins meanwhile', () => {
+    const e = new SlotEngine({ seed: 11, balance: 1000 });
+    const s = e.startSpin({ forceCrate: 'add_wilds' });
+    expect(s.crateOffers).toBe(3);
+    expect(s.outcome).toBeUndefined();
+    expect(e.balance).toBe(1000 - e.bet);
+    expect(e.canSpin()).toBe(false);
+    expect(() => e.startSpin()).toThrow();
+    const o = e.pickCrate(2);
+    expect(o.result.cratePick).toBe(2);
+    expect(e.balance).toBe(1000 - e.bet + o.result.totalWin);
+    expect(e.canSpin()).toBe(true);
+  });
+
+  it('settles immediately when no crate is offered', () => {
+    const e = new SlotEngine({ seed: 11 });
+    const s = e.startSpin({ forceDealerHand: true });
+    expect(s.outcome).toBeDefined();
+    expect(() => e.pickCrate(0)).toThrow();
+  });
+});
+
+describe('iron shackles (sticky wilds)', () => {
+  it('locks landed wilds up to the cap and re-applies them next spin', () => {
+    let b = applyArtifact(startBonus(100, 10), { kind: 'iron_shackles' });
+    const g = gridFromRows([
+      ['spade', 'wild', 'club', 'wild', 'spade'],
+      ['heart', 'club', 'wild', 'spade', 'heart'],
+      ['club', 'diamond', 'spade', 'wild', 'club'],
+      ['diamond', 'wild', 'heart', 'club', 'wild'],
+    ]);
+    b = lockStickyWilds(b, g);
+    expect(b.stickyCells).toHaveLength(FEATURE_CONFIG.maxStickyWilds);
+    const e = new SlotEngine({ seed: 3 });
+    e.spin({ forceGrid: gridFromRows(scatterRows(3)) });
+    e.bonus = { ...b, ledgers: 0 };
+    const o = e.spin();
+    for (const c of b.stickyCells) {
+      const s = o.result.finalGrid[c.reel][c.row];
+      expect(s === 'wild' || s === 'scatter').toBe(true);
+    }
+  });
+});
+
+describe('round win cap', () => {
+  it('reduces a win that would exceed the cap and ends the bonus', () => {
+    const e = new SlotEngine({ seed: 8, balance: 1000 });
+    e.setBetIndex(0); // 25
+    e.spin({ forceGrid: gridFromRows(scatterRows(3)) });
+    const wilds = gridFromRows(Array.from({ length: 4 }, () => ['wild', 'wild', 'wild', 'wild', 'wild'] as SymbolId[]));
+    e.bonus!.ledgers = 50;
+    let last;
+    let guard = 0;
+    while (e.bonus && guard++ < 100) last = e.spin({ forceGrid: wilds, forceDealerHand: false });
+    const total = e.history.filter((h) => h.phase === 'bonus').reduce((a, h) => a + h.win, 0) + e.history[e.history.length - 1].win;
+    expect(last!.result.capped).toBe(true);
+    expect(last!.bonusEnded?.capped).toBe(true);
+    expect(total).toBe(FEATURE_CONFIG.maxWinX * 25);
   });
 });
 

@@ -23,6 +23,8 @@ export interface LineWin {
   cells: Cell[];
   /** Base pay as a multiple of the line bet (before multipliers). */
   basePay: number;
+  /** Product of multiplier potions on this line's winning cells (1 if none). */
+  potionMultiplier: number;
   /** Credits won on this line, after multipliers. */
   win: number;
 }
@@ -48,7 +50,22 @@ export type FeatureStep =
     }
   | { type: 'dealer_hand'; reel: number; symbol: SymbolId; changes: CellChange[] }
   | { type: 'eye_sigil'; from: SymbolId; to: SymbolId; changes: CellChange[] }
-  | { type: 'raven_feather'; changes: CellChange[] };
+  | { type: 'raven_feather'; changes: CellChange[] }
+  | { type: 'sticky_wilds'; changes: CellChange[] }
+  | { type: 'potion'; cell: Cell; value: number };
+
+export type CrateStep = Extract<FeatureStep, { type: 'crate' }>;
+
+/** One of the three crates the Dealer offers. Fully resolved by the engine before the player picks. */
+export interface CrateOffer {
+  step: CrateStep;
+  grid: Grid;
+}
+
+export interface Potion {
+  cell: Cell;
+  value: number;
+}
 
 export interface ArtifactDrop {
   kind: ArtifactKind;
@@ -78,4 +95,11 @@ export interface SpinResult {
   freeSpinsAwarded: number;
   /** Artifact collected this free spin, if any. */
   artifact?: ArtifactDrop;
+  /** The three crates offered (when a crate fired) and which one was opened. */
+  crateOffers?: CrateStep[];
+  cratePick?: number;
+  /** Multiplier potions that landed this spin. */
+  potions: Potion[];
+  /** True when the win was reduced by the round win cap. */
+  capped: boolean;
 }

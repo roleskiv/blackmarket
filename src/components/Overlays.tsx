@@ -13,43 +13,91 @@ export interface CrateReveal {
   multiplier?: number;
 }
 
-export const CrateOverlay = forwardRef<HTMLDivElement, { reveal: CrateReveal | null }>(function CrateOverlay({ reveal }, ref) {
+function CrateBox() {
+  return (
+    <div className="crate-scale">
+    <div className="crate" data-part="crate">
+      <div className="crate-light" data-part="light" />
+      <div className="crate-lid" data-part="lid">
+        <div className="crate-plank" />
+      </div>
+      <div className="crate-box">
+        <div className="crate-band left" />
+        <div className="crate-band right" />
+        <div className="crate-crack c1" />
+        <div className="crate-crack c2" />
+        <div className="crate-crack c3" />
+        <div className="crate-seal">BM</div>
+      </div>
+    </div>
+    </div>
+  );
+}
+
+/**
+ * Crate pick: three crates the engine has already filled. The player opens one;
+ * the other two then show what was inside them.
+ */
+export const CrateOverlay = forwardRef<
+  HTMLDivElement,
+  { reveal: CrateReveal | null; passed: (string | null)[]; choosing: boolean; onPick: (i: number) => void; countdown: number | null }
+>(function CrateOverlay({ reveal, passed, choosing, onPick, countdown }, ref) {
   return (
     <div ref={ref} className="cine-overlay crate-overlay" style={{ display: 'none' }}>
-      <div className="crate-stage">
-        <div className="crate" data-part="crate">
-          <div className="crate-light" data-part="light" />
-          <div className="crate-lid" data-part="lid">
-            <div className="crate-plank" />
+      <div className="crate-prompt" data-part="prompt">
+        <div className="crate-prompt-kicker">Black Market Crates</div>
+        <div className="crate-prompt-title">{choosing ? 'The Dealer offers three crates. Pick one.' : '\u00a0'}</div>
+        {choosing && countdown !== null && <div className="crate-prompt-hint">Auto-pick in {countdown}s · keys 1–3</div>}
+      </div>
+      <div className="crate-row" data-part="row">
+        {[0, 1, 2].map((i) => (
+          <button key={i} className={`crate-slot ${choosing ? 'is-choosing' : ''}`} data-part="slot" data-index={i} onClick={() => choosing && onPick(i)} disabled={!choosing} aria-label={`Open crate ${i + 1}`}>
+            <CrateBox />
+            <span className="crate-number">{i + 1}</span>
+            {passed[i] && <span className="crate-passed">Passed on: {passed[i]}</span>}
+          </button>
+        ))}
+      </div>
+      <div className="crate-card" data-part="card">
+        <div className="crate-card-kicker">You opened</div>
+        <div className="crate-card-title">{reveal?.title}</div>
+        {reveal?.multiplier ? (
+          <div className="crate-card-mult">
+            <PotionIcon value={reveal.multiplier} />
           </div>
-          <div className="crate-box">
-            <div className="crate-plank" />
-            <div className="crate-plank" />
-            <div className="crate-band left" />
-            <div className="crate-band right" />
-            <div className="crate-crack c1" />
-            <div className="crate-crack c2" />
-            <div className="crate-crack c3" />
-            <div className="crate-seal">BM</div>
+        ) : null}
+        {reveal?.from && reveal?.to ? (
+          <div className="crate-card-swap">
+            <SymbolImage id={reveal.from} />
+            <span>➜</span>
+            <SymbolImage id={reveal.to} />
           </div>
-        </div>
-        <div className="crate-card" data-part="card">
-          <div className="crate-card-kicker">Black Market Crate</div>
-          <div className="crate-card-title">{reveal?.title}</div>
-          {reveal?.multiplier ? <div className="crate-card-mult">×{reveal.multiplier}</div> : null}
-          {reveal?.from && reveal?.to ? (
-            <div className="crate-card-swap">
-              <SymbolImage id={reveal.from} />
-              <span>➜</span>
-              <SymbolImage id={reveal.to} />
-            </div>
-          ) : null}
-          <div className="crate-card-desc">{reveal?.detail ?? reveal?.description}</div>
-        </div>
+        ) : null}
+        <div className="crate-card-desc">{reveal?.detail ?? reveal?.description}</div>
       </div>
     </div>
   );
 });
+
+/** The green ×N multiplier potion (crate effect and reel potions). */
+export function PotionIcon({ value, small }: { value: number; small?: boolean }) {
+  return (
+    <svg viewBox="0 0 60 72" className={`potion-icon ${small ? 'small' : ''}`} aria-label={`×${value} multiplier`}>
+      <defs>
+        <radialGradient id="potionGlass" cx="0.4" cy="0.35" r="0.8">
+          <stop offset="0" stopColor="#d6ffcf" />
+          <stop offset="0.45" stopColor="#7dff6a" />
+          <stop offset="1" stopColor="#1f6e16" />
+        </radialGradient>
+      </defs>
+      <rect x="22" y="2" width="16" height="10" rx="2" fill="#8a5a2a" stroke="#3a240e" strokeWidth="2" />
+      <path d="M24 12 h12 v10 c10 4 18 13 18 25 c0 14 -11 23 -24 23 s-24 -9 -24 -23 c0 -12 8 -21 18 -25 z" fill="url(#potionGlass)" stroke="#1a3a12" strokeWidth="3" />
+      <path d="M14 40 c4 -6 10 -9 14 -10" stroke="#f4fff0" strokeWidth="3" strokeLinecap="round" opacity="0.7" fill="none" />
+      <rect x="10" y="38" width="40" height="20" rx="4" fill="#1d2a14" stroke="#c9a24a" strokeWidth="1.5" />
+      <text x="30" y="53" textAnchor="middle" fontFamily="Cinzel, serif" fontWeight="900" fontSize="15" fill="#f1d58a">×{value}</text>
+    </svg>
+  );
+}
 
 /* ───────────────────────── Dealer's Hand ───────────────────────── */
 

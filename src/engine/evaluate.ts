@@ -1,7 +1,7 @@
 import { PAYLINES } from '../config/paylines';
 import { REELS, ROWS } from '../config/game';
 import { SYMBOLS, type SymbolId } from '../config/symbols';
-import type { Cell, Grid, LineWin, ScatterWin } from './types';
+import type { Cell, Grid, LineWin, Potion, ScatterWin } from './types';
 
 /**
  * Evaluate one payline, left → right.
@@ -39,20 +39,29 @@ export function payFor(symbol: SymbolId, count: number): number {
   return SYMBOLS[symbol].pays[c];
 }
 
-export function evaluateLines(grid: Grid, lineBet: number, multiplier = 1): LineWin[] {
+/**
+ * Evaluate all 25 paylines. `multiplier` applies to every line win; each
+ * multiplier potion multiplies only the line wins whose winning cells include
+ * the potion's cell (several potions on one line multiply together).
+ */
+export function evaluateLines(grid: Grid, lineBet: number, multiplier = 1, potions: Potion[] = []): LineWin[] {
   const wins: LineWin[] = [];
   PAYLINES.forEach((rows, line) => {
     const symbols = rows.map((row, reel) => grid[reel][row]);
     const res = evaluateLine(symbols);
     if (!res) return;
     const cells: Cell[] = rows.slice(0, res.count).map((row, reel) => ({ reel, row }));
+    const potionMultiplier = potions
+      .filter((p) => cells.some((c) => c.reel === p.cell.reel && c.row === p.cell.row))
+      .reduce((m, p) => m * p.value, 1);
     wins.push({
       line,
       symbol: res.symbol,
       count: res.count as 3 | 4 | 5,
       cells,
       basePay: res.pay,
-      win: res.pay * lineBet * multiplier,
+      potionMultiplier,
+      win: res.pay * lineBet * multiplier * potionMultiplier,
     });
   });
   return wins;

@@ -57,6 +57,50 @@ function makeLoop(d, fade = 0.5) {
   }
   return out;
 }
+/** Small Schroeder-style reverb (parallel combs + allpass), wet mix in place. */
+function reverb(d, wet = 0.3, size = 1) {
+  const combs = [1557, 1617, 1491, 1422].map((n) => Math.round(n * size));
+  const out = new Float32Array(d.length);
+  for (const n of combs) {
+    const buf = new Float32Array(n);
+    let idx = 0;
+    for (let i = 0; i < d.length; i++) {
+      const y = buf[idx];
+      buf[idx] = d[i] + y * 0.78;
+      out[i] += y / combs.length;
+      idx = (idx + 1) % n;
+    }
+  }
+  for (const n of [225, 556]) {
+    const buf = new Float32Array(n);
+    let idx = 0;
+    for (let i = 0; i < out.length; i++) {
+      const b = buf[idx];
+      const x = out[i];
+      buf[idx] = x + b * 0.5;
+      out[i] = b - x * 0.5;
+      idx = (idx + 1) % n;
+    }
+  }
+  for (let i = 0; i < d.length; i++) d[i] = d[i] * (1 - wet) + out[i] * wet * 2.2;
+  return d;
+}
+/** Murmur: band-limited noise shaped by moving vowel formants (distant crowd). */
+function murmur(sec, amp = 0.3) {
+  const d = buf(sec);
+  let y1 = 0, y2 = 0;
+  for (let i = 0; i < d.length; i++) {
+    const t = i / SR;
+    const f = 500 + 300 * Math.sin(TAU * 0.7 * t) + 200 * Math.sin(TAU * 1.3 * t + 1);
+    const a1 = 1 - Math.exp((-TAU * f) / SR);
+    y1 += a1 * (rand() - y1);
+    y2 += 0.02 * (y1 - y2);
+    const syll = 0.5 + 0.5 * Math.sin(TAU * 3.1 * t) * Math.sin(TAU * 0.37 * t);
+    d[i] = (y1 - y2) * amp * syll;
+  }
+  return d;
+}
+
 const bell = (f, dur = 1.2, amp = 1) => (t) =>
   amp * env(t, 0.003, dur / 4) * (Math.sin(TAU * f * t) + 0.5 * Math.sin(TAU * f * 2.76 * t) + 0.25 * Math.sin(TAU * f * 5.4 * t));
 const thunk = (f = 70, amp = 1) => (t) => amp * env(t, 0.002, 0.06) * Math.sin(TAU * f * t * (1 + 2 * Math.exp(-t * 40)));
@@ -71,7 +115,12 @@ const thunk = (f = 70, amp = 1) => (t) => amp * env(t, 0.002, 0.06) * Math.sin(T
     d[i] = 0.35 * Math.sin(TAU * 55 * t) * lfo + 0.25 * Math.sin(TAU * 82.4 * t + Math.sin(TAU * 0.3 * t)) + 0.2 * Math.sin(TAU * 110.3 * t) * (1 - lfo) + noise[i] * 2.2 * (0.6 + 0.4 * Math.sin(TAU * 0.07 * t));
   }
   for (let k = 0; k < 9; k++) add(d, 0.5 + k * 1.3 + rand() * 0.3, bell(1800 + rand() * 900, 0.6, 0.05), 0.6);
-  writeWav('ambience', makeLoop(d, 0.5), 0.6);
+  const crowd = murmur(12.5, 0.9);
+  for (let i = 0; i < d.length; i++) d[i] += crowd[i];
+  // distant chains and a creaking sign
+  for (let k = 0; k < 5; k++) add(d, 1 + k * 2.3 + rand() * 0.4, (t) => env(t, 0.002, 0.05) * Math.sin(TAU * (2400 + 300 * k) * t) * 0.08, 0.3);
+  add(d, 6.2, (t) => 0.06 * env(t, 0.3, 0.6) * Math.sin(TAU * (180 + 60 * Math.sin(TAU * 4 * t)) * t), 1.4);
+  writeWav('ambience', makeLoop(reverb(d, 0.35, 1.3), 0.5), 0.6);
 }
 // ── Bonus music: pulsing minor arpeggio over drone ─────────────────────────
 {
@@ -84,7 +133,11 @@ const thunk = (f = 70, amp = 1) => (t) => amp * env(t, 0.002, 0.06) * Math.sin(T
   for (let bar = 0; bar < 2; bar++)
     seq.forEach((n, j) => add(d, bar * 4 + j * 0.25, (t) => 0.35 * env(t, 0.005, 0.18) * (Math.sin(TAU * note(n) * t) + 0.3 * Math.sin(TAU * note(n) * 2 * t)), 0.5));
   for (let b = 0; b < 16; b++) add(d, b * 0.5, thunk(55, 0.6), 0.3);
-  writeWav('bonus_music', makeLoop(d, 0.5), 0.6);
+  const bass = [45, 45, 48, 43, 45, 45, 41, 43];
+  bass.forEach((n, j) => add(d, j * 1, (t) => 0.4 * env(t, 0.01, 0.5) * Math.tanh(2 * Math.sin(TAU * note(n) * t)), 1));
+  for (let h = 0; h < 32; h++) add(d, h * 0.25 + 0.125, (t) => env(t, 0.001, 0.02) * rand() * 0.12, 0.06);
+  [69, 72, 76, 74].forEach((n, j) => add(d, j * 2, (t) => 0.12 * env(t, 0.3, 1.2) * (Math.sin(TAU * note(n) * t) + Math.sin(TAU * note(n) * 1.004 * t)), 2.2));
+  writeWav('bonus_music', makeLoop(reverb(d, 0.25), 0.5), 0.6);
 }
 // ── Reel spin loop: mechanical ratchet ────────────────────────────────────
 {
@@ -135,7 +188,7 @@ const thunk = (f = 70, amp = 1) => (t) => amp * env(t, 0.002, 0.06) * Math.sin(T
   [69, 73, 76, 81].forEach((n) => add(d, 0.85, (t) => 0.35 * env(t, 0.05, 1.0) * (Math.sin(TAU * note(n) * t) + 0.5 * Math.sin(TAU * note(n) * 1.005 * t)), 2.3));
   for (let k = 0; k < 30; k++) add(d, 0.9 + k * 0.07, bell(1500 + Math.abs(rand()) * 2500, 0.3, 0.12), 0.3);
   add(d, 0.85, thunk(50, 1), 0.4);
-  writeWav('win_big', d, 0.9);
+  writeWav('win_big', reverb(d, 0.25), 0.9);
 }
 // ── Crate: rattle, burst ──────────────────────────────────────────────────
 {
@@ -175,7 +228,9 @@ const thunk = (f = 70, amp = 1) => (t) => amp * env(t, 0.002, 0.06) * Math.sin(T
     }
     d[i] = v * env(t, 0.15, 0.5);
   }
-  writeWav('dealer', lowpass(d, 2500), 0.7);
+  // a low chuckle tail
+  for (let k = 0; k < 3; k++) add(d, 0.75 + k * 0.14, (t) => 0.5 * env(t, 0.01, 0.06) * Math.sin(TAU * 110 * t) * (1 + 0.5 * Math.sin(TAU * 600 * t)), 0.12);
+  writeWav('dealer', reverb(lowpass(d, 2500), 0.25), 0.7);
 }
 // ── Vault: clunks, rumble, creak, golden swell ────────────────────────────
 {
@@ -189,7 +244,7 @@ const thunk = (f = 70, amp = 1) => (t) => amp * env(t, 0.002, 0.06) * Math.sin(T
   add(d, 1.4, (t) => rumble[Math.min(rumble.length - 1, Math.round(t * SR))] * 5 * env(t, 0.3, 0.8), 2.6);
   add(d, 1.4, (t) => 0.25 * env(t, 0.2, 0.6) * Math.sin(TAU * (140 + 40 * Math.sin(TAU * 3 * t)) * t), 1.6);
   [57, 64, 69, 73].forEach((n) => add(d, 2.0, (t) => 0.3 * env(t, 0.4, 1.0) * Math.sin(TAU * note(n) * t), 2.2));
-  writeWav('vault', d, 0.9);
+  writeWav('vault', reverb(d, 0.3, 1.4), 0.9);
 }
 // ── Transition whoosh ─────────────────────────────────────────────────────
 {
@@ -210,4 +265,24 @@ const thunk = (f = 70, amp = 1) => (t) => amp * env(t, 0.002, 0.06) * Math.sin(T
   const d = buf(1.0);
   [76, 79, 83, 88].forEach((n, i) => add(d, i * 0.05, bell(note(n), 0.8, 0.6), 0.9));
   writeWav('artifact', d, 0.7);
+}
+
+// ── Tease: heartbeat + rising whisper when two scatters are in ─────────────
+{
+  const d = buf(2.2);
+  [0, 0.28, 0.9, 1.18].forEach((s0, i) => add(d, s0, thunk(48 + i * 3, i % 2 ? 0.6 : 1), 0.25));
+  const n = Float32Array.from(buf(2.2), () => rand());
+  lowpass(n, 1800);
+  add(d, 0, (t) => n[Math.min(n.length - 1, Math.round(t * SR))] * 0.8 * Math.min(1, t / 2) * Math.sin(TAU * (200 + 500 * t) * t) , 2.2);
+  writeWav('tease', reverb(d, 0.2), 0.8);
+}
+// ── Potion: bubbling glugs and a bright chime ─────────────────────────────
+{
+  const d = buf(1.2);
+  for (let k = 0; k < 9; k++) {
+    const f = 300 + Math.abs(rand()) * 500;
+    add(d, k * 0.06 + Math.abs(rand()) * 0.03, (t) => 0.5 * env(t, 0.002, 0.04) * Math.sin(TAU * f * (1 + 3 * t) * t), 0.12);
+  }
+  [79, 84, 91].forEach((n, i) => add(d, 0.45 + i * 0.07, bell(note(n), 0.7, 0.5), 0.7));
+  writeWav('potion', reverb(d, 0.2), 0.8);
 }

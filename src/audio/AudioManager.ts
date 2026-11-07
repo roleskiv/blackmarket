@@ -9,10 +9,10 @@ import { Howl, Howler } from 'howler';
 export type SfxName =
   | 'reel_spin' | 'reel_stop' | 'click' | 'coin' | 'scatter_land' | 'wild_land'
   | 'win_small' | 'win_big' | 'crate_shake' | 'crate_open' | 'magic' | 'dealer'
-  | 'vault' | 'transition' | 'artifact';
+  | 'vault' | 'transition' | 'artifact' | 'tease' | 'potion';
 export type MusicName = 'ambience' | 'bonus_music';
 
-const SFX: SfxName[] = ['reel_spin', 'reel_stop', 'click', 'coin', 'scatter_land', 'wild_land', 'win_small', 'win_big', 'crate_shake', 'crate_open', 'magic', 'dealer', 'vault', 'transition', 'artifact'];
+const SFX: SfxName[] = ['reel_spin', 'reel_stop', 'click', 'coin', 'scatter_land', 'wild_land', 'win_small', 'win_big', 'crate_shake', 'crate_open', 'magic', 'dealer', 'vault', 'transition', 'artifact', 'tease', 'potion'];
 const MUSIC: MusicName[] = ['ambience', 'bonus_music'];
 
 const base = import.meta.env.BASE_URL;

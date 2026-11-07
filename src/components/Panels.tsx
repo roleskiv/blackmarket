@@ -165,7 +165,7 @@ export function InfoModal({ onClose, betIndex }: { onClose: () => void; betIndex
         <div className="features">
           <section>
             <h3>Black Market Crates</h3>
-            <p>On any spin ({Math.round(FEATURE_CONFIG.crateChance * 100)}% base / {Math.round(FEATURE_CONFIG.crateChanceBonus * 100)}% free spins, prototype values) the Dealer slides a crate into the light. Its contents apply to that spin before wins are counted:</p>
+            <p>On any spin ({Math.round(FEATURE_CONFIG.crateChance * 100)}% base / {Math.round(FEATURE_CONFIG.crateChanceBonus * 100)}% free spins, prototype values) the Dealer offers three crates holding three different effects. The game fills all three before you choose, in random order. Open one and its effect applies to that spin before wins are counted; the other two then show what you passed on. During auto-spin, or if you don’t choose within 10 seconds, a crate is picked at random.</p>
             <ul>
               {FEATURE_CONFIG.crateEffects.map((e) => (
                 <li key={e.kind}><b>{e.title}</b> — {e.description}</li>
@@ -175,6 +175,10 @@ export function InfoModal({ onClose, betIndex }: { onClose: () => void; betIndex
           <section>
             <h3>The Dealer’s Hand</h3>
             <p>If no crate opens, the Dealer may reach in ({Math.round(FEATURE_CONFIG.dealerHandChance * 100)}% per spin). He deals one premium symbol or a Wild and points at a reel — every non-Scatter symbol on that reel becomes the dealt card. Wilds are never dealt to reel 1.</p>
+          </section>
+          <section>
+            <h3>Multiplier potions</h3>
+            <p>A ×2, ×3 or ×5 potion sometimes lands on a reel position ({Math.round(FEATURE_CONFIG.potionChance * 100)}% base / {Math.round(FEATURE_CONFIG.potionChanceBonus * 100)}% free spins). Any line win that uses that position is multiplied. Potions stack with each other and with crate and bonus multipliers.</p>
           </section>
           <section>
             <h3>The Dealer’s Vault</h3>
@@ -199,6 +203,7 @@ export function InfoModal({ onClose, betIndex }: { onClose: () => void; betIndex
             <li>Wins on different paylines are added together.</li>
             <li>Every outcome is generated and evaluated by the game engine before anything is animated. Skipping animations never changes a result.</li>
             <li>Free spins are played at the bet that triggered them and do not deduct credits.</li>
+            <li>Win cap: a round (a paid spin plus any bonus it triggers) pays at most {FEATURE_CONFIG.maxWinX.toLocaleString()}× the total bet. A win that would pass the cap is reduced to it and the bonus ends.</li>
             <li className="proto-note">Prototype disclaimer: reel weights, payouts and feature frequencies are uncalibrated. Simulation figures shown in the README are estimates, not certified RTP, volatility or maximum-win values.</li>
           </ul>
         </div>

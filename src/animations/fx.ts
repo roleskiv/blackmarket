@@ -3,7 +3,13 @@
  * A single transparent full-screen canvas sits above the game with
  * pointer-events disabled. If WebGL/Pixi fails to start, every call no-ops.
  */
-import { Application, Container, Sprite, Texture } from 'pixi.js';
+import type { Application, Container, Sprite, Texture } from 'pixi.js';
+
+// PixiJS is loaded lazily so the game screen paints before the particle engine downloads.
+let PIXI: typeof import('pixi.js') | null = null;
+/** Fewer particles and a lower render resolution on small / touch screens. */
+const isSmall = () => window.innerWidth < 760 || matchMedia('(pointer: coarse)').matches;
+const density = () => (isSmall() ? 0.5 : 1);
 
 interface Particle {
   s: Sprite;
@@ -29,7 +35,7 @@ function softDot(size: number, hard = 0.0): Texture {
   grd.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = grd;
   g.fillRect(0, 0, size, size);
-  return Texture.from(c);
+  return PIXI!.Texture.from(c);
 }
 
 function spark(size: number): Texture {
@@ -49,14 +55,14 @@ function spark(size: number): Texture {
   }
   g.closePath();
   g.fill();
-  return Texture.from(c);
+  return PIXI!.Texture.from(c);
 }
 
 const hex = (c: string) => parseInt(c.replace('#', ''), 16);
 
 class FxLayer {
   private app: Application | null = null;
-  private layer = new Container();
+  private layer!: Container;
   private particles: Particle[] = [];
   private tex: { dot: Texture; smoke: Texture; spark: Texture } | null = null;
   enabled = true;
@@ -65,13 +71,15 @@ class FxLayer {
   async mount(host: HTMLElement) {
     if (this.app) return;
     try {
-      const app = new Application();
+      PIXI = await import('pixi.js');
+      this.layer = new PIXI.Container();
+      const app = new PIXI.Application();
       await app.init({
         backgroundAlpha: 0,
         resizeTo: window,
         antialias: false,
         autoDensity: true,
-        resolution: Math.min(window.devicePixelRatio || 1, 2),
+        resolution: Math.min(window.devicePixelRatio || 1, isSmall() ? 1.5 : 2),
         preference: 'webgl',
       });
       app.canvas.style.position = 'fixed';
@@ -102,7 +110,7 @@ class FxLayer {
   }
 
   private add(tex: Texture, x: number, y: number, o: Partial<Particle> & { tint: number; scale: number; alpha?: number; blend?: 'add' | 'normal' }) {
-    const s = new Sprite(tex);
+    const s = new PIXI!.Sprite(tex);
     s.anchor.set(0.5);
     s.x = x;
     s.y = y;
@@ -131,7 +139,7 @@ class FxLayer {
     const existing = this.particles.filter((p) => p.ambient).length;
     const W = window.innerWidth;
     const H = window.innerHeight;
-    const target = Math.round(Math.min(70, (W * H) / 18000));
+    const target = Math.round(Math.min(70, (W * H) / 18000) * density());
     for (let i = existing; i < target; i++) this.ambientDust(Math.random() * W, Math.random() * H, true);
   }
 
@@ -178,6 +186,7 @@ class FxLayer {
   }
 
   burst(x: number, y: number, colors: string[], count = 60, power = 1) {
+    count = Math.max(1, Math.round(count * density()));
     if (!this.app || !this.tex || !this.enabled) return;
     for (let i = 0; i < count; i++) {
       const a = Math.random() * Math.PI * 2;
@@ -195,6 +204,7 @@ class FxLayer {
   }
 
   smoke(x: number, y: number, color = '#7a3cc0', count = 14, spread = 60) {
+    count = Math.max(1, Math.round(count * density()));
     if (!this.app || !this.tex || !this.enabled) return;
     for (let i = 0; i < count; i++) {
       this.add(this.tex.smoke, x + (Math.random() - 0.5) * spread, y + (Math.random() - 0.5) * spread * 0.6, {
@@ -211,6 +221,7 @@ class FxLayer {
   }
 
   sparkle(x: number, y: number, w: number, h: number, color: string, count = 8) {
+    count = Math.max(1, Math.round(count * density()));
     if (!this.app || !this.tex || !this.enabled) return;
     for (let i = 0; i < count; i++) {
       this.add(this.tex.spark, x + Math.random() * w, y + Math.random() * h, {
@@ -226,6 +237,7 @@ class FxLayer {
 
   /** A stream of golden coins/light rising from a point (big wins, vault). */
   fountain(x: number, y: number, colors: string[], count = 80) {
+    count = Math.max(1, Math.round(count * density()));
     if (!this.app || !this.tex || !this.enabled) return;
     for (let i = 0; i < count; i++) {
       this.add(this.tex.dot, x + (Math.random() - 0.5) * 80, y, {

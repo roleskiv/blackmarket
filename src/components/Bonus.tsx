@@ -14,6 +14,9 @@ const ARTIFACT_ICON: Record<ArtifactKind, JSX.Element> = {
   hourglass: (
     <svg viewBox="0 0 40 40"><path d="M11 6h18M11 34h18M13 6c0 10 14 10 14 14S13 24 13 34M27 6c0 10-14 10-14 14s14 4 14 14" stroke="#7dff6a" strokeWidth="2" fill="none" /><path d="M16 30h8l-4-5z" fill="#7dff6a" /></svg>
   ),
+  iron_shackles: (
+    <svg viewBox="0 0 40 40"><circle cx="13" cy="20" r="8" fill="none" stroke="#9fb4c8" strokeWidth="3" /><circle cx="27" cy="20" r="8" fill="none" stroke="#9fb4c8" strokeWidth="3" /><rect x="17" y="18" width="6" height="4" fill="#9fb4c8" /></svg>
+  ),
   eye_sigil: (
     <svg viewBox="0 0 40 40"><path d="M4 20 C 12 8 28 8 36 20 C 28 32 12 32 4 20 Z" fill="#3a0a16" stroke="#ff2d6f" strokeWidth="2" /><circle cx="20" cy="20" r="6" fill="#ff2d6f" /><ellipse cx="20" cy="20" rx="1.6" ry="5" fill="#120006" /></svg>
   ),

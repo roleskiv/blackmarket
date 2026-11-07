@@ -13,7 +13,7 @@ import { useSettings } from './hooks/useSettings';
 import { skipper } from './animations/skip';
 import { fx, centerOf } from './animations/fx';
 import { celebrateCells, countUp } from './animations/winEffects';
-import { playCrate } from './animations/crateAnimation';
+import { introCrates, openCrate, closeCrates } from './animations/crateAnimation';
 import { playDealerHand } from './animations/dealerAnimation';
 import { playVault } from './animations/vaultAnimation';
 import { Backdrop } from './components/Backdrop';
@@ -21,13 +21,15 @@ import { TopBar } from './components/TopBar';
 import { Dealer, type DealerHandle } from './components/Dealer';
 import { ReelGrid, cellKey, type CellState, type ReelGridHandle } from './components/ReelGrid';
 import { Controls } from './components/Controls';
-import { CrateOverlay, DealerHandOverlay, VaultOverlay, type CrateReveal } from './components/Overlays';
+import { CrateOverlay, DealerHandOverlay, PotionIcon, VaultOverlay, type CrateReveal } from './components/Overlays';
 import { ArtifactToast, BonusHud, BonusSummaryModal, artifactDef } from './components/Bonus';
 import { WinBanner, type BannerTier } from './components/WinBanner';
 import { InfoModal, SettingsPanel } from './components/Panels';
 import { SymbolImage, preloadSymbols } from './components/SymbolImage';
 import { formatCredits } from './components/format';
-import type { ArtifactDrop } from './engine/types';
+import { LoadingScreen } from './components/LoadingScreen';
+import type { ArtifactDrop, Potion } from './engine/types';
+import gsap from 'gsap';
 
 const urlSeed = (() => {
   try {
@@ -75,6 +77,11 @@ export default function App() {
   const [lines, setLines] = useState<number[]>([]);
   const [cycle, setCycle] = useState<{ line: number; cells: string[] }[]>([]);
   const [crateReveal, setCrateReveal] = useState<CrateReveal | null>(null);
+  const [cratePassed, setCratePassed] = useState<(string | null)[]>([null, null, null]);
+  const [crateChoosing, setCrateChoosing] = useState(false);
+  const [crateCountdown, setCrateCountdown] = useState<number | null>(null);
+  const cratePickResolve = useRef<((i: number) => void) | null>(null);
+  const [potions, setPotions] = useState<Potion[]>([]);
   const [handSymbol, setHandSymbol] = useState<SymbolId | null>(null);
   const [vaultSpins, setVaultSpins] = useState(0);
   const [bonus, setBonus] = useState<BonusState | null>(null);
@@ -101,12 +108,24 @@ export default function App() {
   const stageRef = useRef<HTMLDivElement>(null);
   const fxHost = useRef<HTMLDivElement>(null);
 
-  // ── Boot ────────────────────────────────────────────────────────────────
+  // ── Boot: preload art behind a loading screen, then wait for "Enter". ──
+  const [loadProgress, setLoadProgress] = useState(0);
+  const [entered, setEntered] = useState(false);
   useEffect(() => {
-    preloadSymbols();
+    let cancelled = false;
+    const fonts = (document as Document & { fonts?: FontFaceSet }).fonts?.ready ?? Promise.resolve();
+    Promise.all([preloadSymbols((d, t) => !cancelled && setLoadProgress(d / t)), fonts]).then(() => !cancelled && setLoadProgress(1));
     if (fxHost.current) fx.mount(fxHost.current);
-    audio.playMusic('ambience');
+    return () => {
+      cancelled = true;
+    };
   }, []);
+  const enterMarket = () => {
+    audio.init();
+    audio.playMusic('ambience');
+    audio.play('transition', { volume: 0.6 });
+    setEntered(true);
+  };
 
   useEffect(() => {
     audio.setEnabled(settings.sound);
@@ -137,6 +156,53 @@ export default function App() {
     setCellStates({});
     setLines([]);
     setMultiplier(1);
+    setPotions([]);
+  };
+
+  // Crate pick countdown: if the player doesn't choose, a crate is picked for them.
+  useEffect(() => {
+    if (!crateChoosing) return;
+    let left = 10;
+    setCrateCountdown(left);
+    const id = setInterval(() => {
+      left -= 1;
+      setCrateCountdown(left);
+      if (left <= 0) cratePickResolve.current?.(Math.floor(Math.random() * 3));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [crateChoosing]);
+
+  /** Show the three crates, wait for the player's pick, then settle the spin in the engine. */
+  const chooseCrate = async (): Promise<SpinOutcome> => {
+    const s = settingsRef.current;
+    setCrateReveal(null);
+    setCratePassed([null, null, null]);
+    dealer.current?.lean();
+    dealer.current?.eyeFlare(1);
+    await introCrates(crateRef.current!, { reducedMotion: s.reducedMotion });
+    let pick: number;
+    if (autoRef.current !== null) {
+      // Auto-spin picks for the player. The engine shuffles the offers, so any crate is an equal gamble.
+      await skipper.wait(0.5);
+      pick = Math.floor(Math.random() * 3);
+    } else {
+      setCrateChoosing(true);
+      pick = await new Promise<number>((resolve) => (cratePickResolve.current = resolve));
+      cratePickResolve.current = null;
+      setCrateChoosing(false);
+      setCrateCountdown(null);
+    }
+    audio.play('click');
+    const o = engine.pickCrate(pick);
+    const step = o.result.steps.find((x) => x.type === 'crate') as Extract<FeatureStep, { type: 'crate' }>;
+    setCrateReveal(crateRevealFor(step));
+    setCratePassed(o.result.crateOffers!.map((st, i) => (i === pick ? null : FEATURE_CONFIG.crateEffects.find((e) => e.kind === st.effect)!.title)));
+    await new Promise((r) => requestAnimationFrame(r));
+    skipper.reset();
+    await openCrate(crateRef.current!, pick, { reducedMotion: s.reducedMotion, turbo: s.turbo, color: '#7dff6a' });
+    await closeCrates(crateRef.current!, { reducedMotion: s.reducedMotion });
+    dealer.current?.settle();
+    return o;
   };
 
   // ── Feature presentation ────────────────────────────────────────────────
@@ -144,14 +210,7 @@ export default function App() {
     const s = settingsRef.current;
     const g = reels.current!;
     if (step.type === 'crate') {
-      setCrateReveal(crateRevealFor(step));
-      audio.play('dealer', { volume: 0.6 });
-      dealer.current?.lean();
-      await playCrate(
-        { overlay: crateRef.current!, crate: part(crateRef.current, 'crate'), lid: part(crateRef.current, 'lid'), light: part(crateRef.current, 'light'), card: part(crateRef.current, 'card') },
-        { reducedMotion: s.reducedMotion, turbo: s.turbo, color: '#7dff6a' },
-      );
-      dealer.current?.settle();
+      // The crate cinematic already played in chooseCrate(); apply its effect to the reels.
       if (step.effect === 'multiplier') {
         setMultiplier(step.multiplier);
         audio.play('magic');
@@ -176,6 +235,18 @@ export default function App() {
       await g.applyChanges(step.changes, 'magic');
     } else if (step.type === 'raven_feather') {
       await g.applyChanges(step.changes, 'wild');
+    } else if (step.type === 'sticky_wilds') {
+      audio.play('wild_land', { volume: 0.5 });
+      await g.applyChanges(step.changes, 'wild');
+    } else if (step.type === 'potion') {
+      audio.play('potion');
+      setPotions((p) => [...p, { cell: step.cell, value: step.value }]);
+      const el = g.cellEl(step.cell.reel, step.cell.row);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        fx.burst(r.left + r.width / 2, r.top + r.height / 2, ['#7dff6a', '#d6ffcf', '#f1d58a'], 40, 0.6);
+      }
+      await skipper.wait(s.turbo ? 0.3 : 0.7);
     }
   };
 
@@ -194,6 +265,10 @@ export default function App() {
       r.lineWins.flatMap((w) => w.cells.map((c) => ({ el: g.cellEl(c.reel, c.row), symbol: w.symbol }))),
       s.reducedMotion ? 0 : 1,
     );
+    // One rising chime per winning line.
+    r.lineWins.slice(0, 8).forEach((_, i) =>
+      gsap.delayedCall(i * (s.turbo ? 0.06 : 0.12), () => audio.play('win_small', { volume: 0.35, rate: 1 + i * 0.09 })),
+    );
     const x = r.totalWin / r.bet;
     const tier: BannerTier | null = x >= TIMING.epicWinThresholdX ? 'epic' : x >= TIMING.megaWinThresholdX ? 'mega' : x >= TIMING.bigWinThresholdX ? 'big' : null;
     if (tier) {
@@ -209,7 +284,6 @@ export default function App() {
       await skipper.wait(1.2);
       setBanner(null);
     } else {
-      audio.play('win_small', { volume: x >= 3 ? 1 : 0.6 });
       if (x >= 5) dealer.current?.react('win');
       await countUp(0, r.totalWin, s.turbo ? 0.3 : Math.min(1.6, 0.4 + x * 0.12), (v) => setWin(startWin + v));
     }
@@ -230,6 +304,7 @@ export default function App() {
 
   // ── Spin orchestration ──────────────────────────────────────────────────
   const runSpin = useCallback(async () => {
+    if (cratePickResolve.current) return; // waiting for the player's crate pick
     if (busyRef.current) {
       skipper.skip();
       return;
@@ -248,43 +323,59 @@ export default function App() {
     const s = settingsRef.current;
     const wasBonus = engine.phase === 'bonus';
 
-    // 1. Resolve AND settle the spin in the engine before anything animates.
-    const o = engine.spin(forceRef.current ?? {});
+    // 1. Resolve the spin in the engine before anything animates. Without a crate
+    //    it is settled right here; with one, it settles the moment a crate is picked.
+    const start = engine.startSpin(forceRef.current ?? {});
     forceRef.current = null;
-    const r = o.result;
     if (!wasBonus) {
-      setBalance(o.balanceBefore - r.bet);
+      setBalance(engine.balance);
       setWin(0);
     }
     const winBefore = wasBonus ? bonusWin : 0;
-    if (wasBonus && o.bonus) setBonus({ ...o.bonus, collected: bonus?.collected ?? [], spinsRemaining: o.bonus.spinsRemaining });
+    if (wasBonus && bonus) setBonus({ ...bonus, spinsRemaining: bonus.spinsRemaining - 1 });
 
     // 2. Reels. Anticipation if two scatters land before the last reels.
     let seen = 0;
     let anticipationFrom: number | undefined;
     for (let i = 0; i < 4; i++) {
-      if (r.initialGrid[i].includes('scatter')) seen++;
+      if (start.initialGrid[i].includes('scatter')) seen++;
       if (seen >= 2) {
         anticipationFrom = i + 1;
         break;
       }
     }
     audio.play('reel_spin', { volume: 0.5 });
-    await reels.current!.spin(r.initialGrid, {
+    const teaseCells: Record<string, CellState> = {};
+    await reels.current!.spin(start.initialGrid, {
       turbo: s.turbo,
       reducedMotion: s.reducedMotion,
       anticipationFrom,
       onReelStop: (i, col) => {
         audio.play('reel_stop', { rate: 0.95 + i * 0.03 });
-        if (col.includes('scatter')) audio.play('scatter_land', { volume: 0.7 });
-        else if (col.includes('wild')) audio.play('wild_land', { volume: 0.4 });
+        const row = col.indexOf('scatter');
+        if (row >= 0) {
+          audio.play('scatter_land', { volume: 0.7 });
+          teaseCells[cellKey(i, row)] = 'scatter';
+          // Tease: two keys are in — the Dealer leans in while the last reels spin.
+          if (Object.keys(teaseCells).length === 2 && i < 4) {
+            audio.play('tease');
+            dealer.current?.lean();
+            dealer.current?.eyeFlare(1.4);
+          }
+          if (Object.keys(teaseCells).length >= 2) setCellStates({ ...teaseCells });
+        } else if (col.includes('wild')) audio.play('wild_land', { volume: 0.4 });
         if (i === 4) audio.stop('reel_spin');
       },
     });
     audio.stop('reel_spin');
+    if (Object.keys(teaseCells).length >= 2) dealer.current?.settle();
 
     // 3. Features, in the exact order the engine applied them.
-    for (const step of r.steps) await playStep(step);
+    for (const step of start.preSteps) await playStep(step);
+    const o = start.outcome ?? (await chooseCrate());
+    const r = o.result;
+    if (Object.keys(teaseCells).length >= 2 && r.scatter.count < 3) setCellStates({});
+    for (const step of r.steps.slice(start.preSteps.length)) await playStep(step);
 
     // 4. Payout is already settled — reflect the real balance now.
     setBalance(o.balanceAfter);
@@ -395,6 +486,10 @@ export default function App() {
   // Keyboard: Space = spin / skip.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (cratePickResolve.current && ['Digit1', 'Digit2', 'Digit3'].includes(e.code)) {
+        cratePickResolve.current(Number(e.code.slice(-1)) - 1);
+        return;
+      }
       if (e.code !== 'Space' || showSettings || showInfo) return;
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'BUTTON')) return;
@@ -464,8 +559,12 @@ export default function App() {
               </div>
             )}
             <div className="reels-wrap">
-              <ReelGrid ref={reels} initial={initialGrid} cellStates={cellStates} lines={lines} spinning={busy} bonus={inBonus} />
-              {multiplier > 1 && <div className="mult-badge">×{multiplier}</div>}
+              <ReelGrid ref={reels} initial={initialGrid} cellStates={cellStates} lines={lines} spinning={busy} bonus={inBonus} potions={potions} stickyCells={bonus?.stickyCells ?? []} />
+              {multiplier > 1 && (
+                <div className="mult-badge">
+                  <PotionIcon value={multiplier} />
+                </div>
+              )}
               {message && <div className="reel-message">{message}</div>}
             </div>
             {inBonus && (
@@ -514,7 +613,14 @@ export default function App() {
       </div>
 
       <DealerHandOverlay ref={handRef} symbol={handSymbol} />
-      <CrateOverlay ref={crateRef} reveal={crateReveal} />
+      <CrateOverlay
+        ref={crateRef}
+        reveal={crateReveal}
+        passed={cratePassed}
+        choosing={crateChoosing}
+        countdown={crateCountdown}
+        onPick={(i) => cratePickResolve.current?.(i)}
+      />
       <VaultOverlay ref={vaultRef} spins={vaultSpins} />
       {banner && <WinBanner tier={banner.tier} amount={banner.amount} onSkip={() => skipper.skip()} />}
       {toast && (
@@ -536,6 +642,7 @@ export default function App() {
         />
       )}
       {showInfo && <InfoModal onClose={() => setShowInfo(false)} betIndex={betIndex} />}
+      {!entered && <LoadingScreen progress={loadProgress} onEnter={enterMarket} />}
     </div>
   );
 }

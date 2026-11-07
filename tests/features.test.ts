@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRng, gridFromRows, resolveCrate, resolveDealerHand, resolveSpin, cloneGrid, generateGrid } from '../src/engine';
+import { createRng, gridFromRows, resolveCrate, resolveDealerHand, resolveSpin, cloneGrid, generateGrid, startSpin, finishSpin, evaluateLines } from '../src/engine';
 import { SYMBOLS, type SymbolId } from '../src/config/symbols';
 import type { CrateEffectKind } from '../src/config/game';
 
@@ -74,7 +74,9 @@ describe('crate effects', () => {
     r[0] = ['horned_skull', 'horned_skull', 'horned_skull', 'spade', 'heart'];
     const grid = gridFromRows(r);
     const plain = resolveSpin({ rng: createRng(1), bet: 100, forceGrid: grid, disableFeatures: true });
-    const boosted = resolveSpin({ rng: createRng(1), bet: 100, forceGrid: grid, forceCrate: 'multiplier' });
+    const pending = startSpin({ rng: createRng(1), bet: 100, forceGrid: grid, forceCrate: 'multiplier' });
+    const idx = pending.offers!.findIndex((o) => o.step.effect === 'multiplier');
+    const boosted = finishSpin(pending, idx);
     expect([2, 3, 5]).toContain(boosted.multiplier);
     const linePlain = plain.lineWins.reduce((a, w) => a + w.win, 0);
     const lineBoost = boosted.lineWins.reduce((a, w) => a + w.win, 0);
@@ -96,5 +98,48 @@ describe("dealer's hand", () => {
     const res = resolveSpin({ rng: createRng(99), bet: 100, forceGrid: base(), forceDealerHand: true });
     expect(res.steps[0].type).toBe('dealer_hand');
     expect(res.finalGrid).not.toEqual(res.initialGrid);
+  });
+});
+
+describe('crate pick (1 of 3)', () => {
+  it('offers three different, fully resolved effects and applies only the picked one', () => {
+    for (let seed = 1; seed < 60; seed++) {
+      const p = startSpin({ rng: createRng(seed), bet: 100, forceGrid: base(), forceCrate: 'add_wilds' });
+      expect(p.offers).toHaveLength(3);
+      expect(new Set(p.offers!.map((o) => o.step.effect)).size).toBe(3);
+      const pick = seed % 3;
+      const r = finishSpin(p, pick);
+      expect(r.cratePick).toBe(pick);
+      expect(r.crateOffers!.map((o) => o.effect)).toEqual(p.offers!.map((o) => o.step.effect));
+      expect(r.finalGrid).toEqual(p.offers![pick].grid);
+      expect(r.steps.filter((s) => s.type === 'crate')).toHaveLength(1);
+    }
+  });
+
+  it('rejects an invalid pick', () => {
+    const p = startSpin({ rng: createRng(2), bet: 100, forceGrid: base(), forceCrate: 'multiplier' });
+    expect(() => finishSpin(p, 3)).toThrow();
+  });
+});
+
+describe('multiplier potions', () => {
+  it('multiply only line wins passing through the potion cell', () => {
+    const r = rows.map((x) => x.slice());
+    r[0] = ['horned_skull', 'horned_skull', 'horned_skull', 'spade', 'heart'];
+    const grid = gridFromRows(r);
+    const on = evaluateLines(grid, 4, 1, [{ cell: { reel: 1, row: 0 }, value: 3 }]);
+    const off = evaluateLines(grid, 4, 1, [{ cell: { reel: 4, row: 3 }, value: 3 }]);
+    const top = (w: typeof on) => w.find((x) => x.line === 0)!;
+    expect(top(on).win).toBe(top(off).win * 3);
+    expect(top(on).potionMultiplier).toBe(3);
+    expect(top(off).potionMultiplier).toBe(1);
+  });
+
+  it('a forced potion is reported as a step and stacks with other multipliers', () => {
+    const r = rows.map((x) => x.slice());
+    r[0] = ['horned_skull', 'horned_skull', 'horned_skull', 'spade', 'heart'];
+    const res = resolveSpin({ rng: createRng(4), bet: 100, forceGrid: gridFromRows(r), disableFeatures: true, forcePotion: { cell: { reel: 0, row: 0 }, value: 5 } });
+    expect(res.steps.some((s) => s.type === 'potion')).toBe(true);
+    expect(res.lineWins.find((w) => w.line === 0)!.win).toBe(SYMBOLS.horned_skull.pays[3] * 4 * 5);
   });
 });

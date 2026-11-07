@@ -14,8 +14,10 @@ const ROWS = 4;
  */
 export function spinReel(strip: HTMLElement, current: SymbolId[], final: SymbolId[], duration: number, anticipation: boolean): Promise<void> {
   const fillerCount = Math.max(6, Math.round(duration * 20));
-  const symbols = [...final, ...visualFiller(fillerCount), ...current];
-  strip.replaceChildren(...symbols.map(symbolElement));
+  const filler = visualFiller(fillerCount);
+  const symbols = [...final, ...filler, ...current];
+  // Sharp art for the cells that start and end in view; pre-blurred art for the blur in between.
+  strip.replaceChildren(...symbols.map((id, i) => symbolElement(id, i >= final.length + 1 && i < final.length + filler.length - 1)));
   const K = symbols.length;
   const cellPct = 100 / K; // yPercent of one cell relative to strip height
   const startY = -(K - ROWS) * cellPct;

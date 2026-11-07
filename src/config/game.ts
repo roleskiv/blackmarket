@@ -36,7 +36,7 @@ export const FEATURE_CONFIG = {
   crateEffects: [
     { kind: 'add_wilds',       title: 'Wild Contraband', description: 'Scatters 2–4 Wilds onto the reels.',                     weight: 30 },
     { kind: 'transform_low',   title: 'Counterfeit Swap', description: 'Every copy of one card suit becomes one uncommon artifact.', weight: 25 },
-    { kind: 'multiplier',      title: 'Loaded Ledger',    description: 'Multiplies all line wins this spin (×2, ×3 or ×5).',      weight: 20 },
+    { kind: 'multiplier',      title: 'Toxic Tonic',      description: 'Multiplies all line wins this spin (×2, ×3 or ×5).',      weight: 20 },
     { kind: 'expanding_wild',  title: 'Raven Column',     description: 'One reel turns fully Wild.',                              weight: 12 },
     { kind: 'upgrade_premium', title: 'Appraiser’s Eye',  description: 'Every copy of one uncommon artifact upgrades to a premium artifact.', weight: 13 },
   ] satisfies CrateEffectConfig[],
@@ -62,14 +62,33 @@ export const FEATURE_CONFIG = {
 
   /** Dealer's Vault bonus. */
   scattersToTrigger: 3,
-  freeSpinsAwarded: { 3: 10, 4: 12, 5: 20 } as Record<number, number>,
+  freeSpinsAwarded: { 3: 9, 4: 11, 5: 17 } as Record<number, number>,
   retriggerSpins: 5,
   /** Chance per free spin that a contraband artifact is collected. */
   artifactChance: 0.4,
   maxWildFeathers: 3,
+  maxStickyWilds: 4,
+
+  /** Black Market Crates: how many crates the Dealer offers to pick from. */
+  crateOfferCount: 3,
+
+  /** Multiplier potions: land on one random cell; line wins through that cell are multiplied. */
+  potionChance: 0.05,
+  potionChanceBonus: 0.08,
+  potionValues: [
+    { value: 2, weight: 60 },
+    { value: 3, weight: 30 },
+    { value: 5, weight: 10 },
+  ],
+
+  /**
+   * Round win cap as a multiple of the total bet (a base spin plus any bonus it
+   * triggers). Enforced by the engine — wins above it are reduced and the bonus ends.
+   */
+  maxWinX: 10_000,
 };
 
-export type ArtifactKind = 'ledger' | 'raven_feather' | 'hourglass' | 'eye_sigil';
+export type ArtifactKind = 'ledger' | 'raven_feather' | 'hourglass' | 'eye_sigil' | 'iron_shackles';
 
 export interface ArtifactConfig {
   kind: ArtifactKind;
@@ -86,4 +105,5 @@ export const ARTIFACTS: ArtifactConfig[] = [
   { kind: 'raven_feather', name: 'Raven Feather',  description: 'Adds 1 extra Wild to every remaining free spin (max 3).',             persistent: true,  weight: 30, color: '#b45cff' },
   { kind: 'hourglass',     name: 'Stolen Hourglass', description: '+2 free spins, instantly.',                                         persistent: false, weight: 20, color: '#7dff6a' },
   { kind: 'eye_sigil',     name: 'Eye Sigil',      description: 'One card suit is permanently upgraded to a premium artifact.',        persistent: true,  weight: 15, color: '#ff2d6f' },
+  { kind: 'iron_shackles', name: 'Iron Shackles',  description: 'Every Wild that lands from now on stays locked in place (up to 4).',  persistent: true,  weight: 5, color: '#9fb4c8' },
 ];

@@ -25,6 +25,8 @@ export const Dealer = forwardRef<DealerHandle, { reducedMotion: boolean; compact
   const arm = useRef<SVGGElement>(null);
   const tip = useRef<SVGCircleElement>(null);
   const breath = useRef<gsap.core.Tween | null>(null);
+  const coin = useRef<SVGGElement>(null);
+  const gem = useRef<SVGPathElement>(null);
 
   useEffect(() => {
     if (reducedMotion) return;
@@ -40,10 +42,19 @@ export const Dealer = forwardRef<DealerHandle, { reducedMotion: boolean; compact
     const blink = gsap.timeline({ repeat: -1, repeatDelay: 3.5 });
     blink.to(eyes.current, { scaleY: 0.1, transformOrigin: '50% 50%', duration: 0.07 }).to(eyes.current, { scaleY: 1, duration: 0.1 });
     const sway = gsap.to(head.current, { rotation: 1.5, transformOrigin: '50% 90%', duration: 3.4, ease: 'sine.inOut', yoyo: true, repeat: -1 });
+    // Idle: a gold coin flips over the knuckles every few seconds.
+    const flip = gsap.timeline({ repeat: -1, repeatDelay: 2.6 });
+    flip
+      .to(coin.current, { y: -26, duration: 0.28, ease: 'power2.out', transformOrigin: '50% 50%' })
+      .to(coin.current, { scaleX: -1, duration: 0.18, ease: 'none', repeat: 3, yoyo: true }, '<')
+      .to(coin.current, { y: 0, duration: 0.3, ease: 'bounce.out' });
+    const glow = gsap.to(gem.current, { opacity: 0.55, duration: 1.4, yoyo: true, repeat: -1, ease: 'sine.inOut' });
     return () => {
       breath.current?.kill();
       blink.kill();
       sway.kill();
+      flip.kill();
+      glow.kill();
     };
   }, [reducedMotion]);
 
@@ -136,9 +147,19 @@ export const Dealer = forwardRef<DealerHandle, { reducedMotion: boolean; compact
         {[350, 385, 420].map((y) => (
           <circle key={y} cx="160" cy={y} r="5" fill="url(#gold)" />
         ))}
+        {/* Inner violet lining at the coat opening */}
+        <path d="M150 340 L 160 470 L 170 340 Z" fill="#3a1460" opacity="0.8" />
+        {/* Shoulder mantle with gold embroidery */}
+        <path d="M96 236 C 120 214 200 214 224 236 C 214 262 192 272 160 274 C 128 272 106 262 96 236 Z" fill="#17121e" stroke="url(#gold)" strokeWidth="2" />
+        <path d="M110 244 q 12 10 24 2 q 12 -8 26 4 q 14 -12 26 -4 q 12 8 24 -2" fill="none" stroke="url(#gold)" strokeWidth="1.4" opacity="0.85" />
+        <circle cx="122" cy="252" r="2" fill="url(#gold)" />
+        <circle cx="198" cy="252" r="2" fill="url(#gold)" />
+        {/* Amulet */}
+        <path d="M146 276 L 160 300 L 174 276" fill="none" stroke="url(#gold)" strokeWidth="1.5" />
+        <path d="M160 296 L 170 310 L 160 326 L 150 310 Z" fill="#2a0f45" stroke="url(#gold)" strokeWidth="2" />
+        <path ref={gem} d="M160 302 L 166 310 L 160 320 L 154 310 Z" fill="#c77dff" style={{ filter: 'drop-shadow(0 0 6px #b45cff)' }} />
         {/* Gold chain across the chest */}
         <path d="M122 300 Q 160 335 198 300" fill="none" stroke="url(#gold)" strokeWidth="2" strokeDasharray="4 3" />
-        <circle cx="160" cy="318" r="7" fill="none" stroke="url(#gold)" strokeWidth="2" />
         {/* Hem trim */}
         <path d="M62 455 C 120 462 200 462 260 455" fill="none" stroke="url(#gold)" strokeWidth="2" opacity="0.7" />
 
@@ -147,6 +168,10 @@ export const Dealer = forwardRef<DealerHandle, { reducedMotion: boolean; compact
         <path d="M214 376 L 238 384" stroke="url(#gold)" strokeWidth="3" />
         <ellipse cx="226" cy="396" rx="20" ry="15" fill="#121016" />
         <circle cx="236" cy="393" r="3.2" fill="url(#gold)" />
+        <g ref={coin}>
+          <circle cx="226" cy="380" r="8" fill="url(#gold)" stroke="#6e4f17" strokeWidth="1.5" />
+          <circle cx="226" cy="380" r="4.5" fill="none" stroke="#6e4f17" strokeWidth="1" />
+        </g>
 
         {/* Raising arm (left side of image) with gloved hand */}
         <g ref={arm}>
@@ -164,6 +189,8 @@ export const Dealer = forwardRef<DealerHandle, { reducedMotion: boolean; compact
         <g ref={head}>
           <path d="M92 220 C 70 140 98 50 160 40 C 222 50 250 140 228 220 C 210 238 110 238 92 220 Z" fill="url(#hood)" />
           <path d="M92 220 C 70 140 98 50 160 40 C 222 50 250 140 228 220" fill="none" stroke="url(#gold)" strokeWidth="2.5" opacity="0.8" />
+          <path d="M118 70 C 100 110 96 170 104 214" fill="none" stroke="#3a2f46" strokeWidth="3" opacity="0.7" />
+          <path d="M202 70 C 220 110 224 170 216 214" fill="none" stroke="#b45cff" strokeWidth="2" opacity="0.35" />
           {/* inner shadow of hood */}
           <path d="M112 210 C 100 150 118 85 160 78 C 202 85 220 150 208 210 Z" fill="#050407" />
           {/* Mask */}

@@ -5,7 +5,7 @@
 import { ARTIFACTS, FEATURE_CONFIG, type ArtifactKind } from '../config/game';
 import { symbolsOfRarity, type SymbolId } from '../config/symbols';
 import type { Rng } from './rng';
-import type { ArtifactDrop } from './types';
+import type { ArtifactDrop, Cell, Grid } from './types';
 
 export interface BonusState {
   /** Total bet that triggered the bonus — every free spin plays at this bet. */
@@ -18,6 +18,9 @@ export interface BonusState {
   ledgers: number;
   feathers: number;
   sigils: { from: SymbolId; to: SymbolId }[];
+  /** Iron Shackles collected: wilds that land become sticky. */
+  sticky: boolean;
+  stickyCells: Cell[];
   /** Every artifact collected, in order. */
   collected: ArtifactDrop[];
   retriggers: number;
@@ -30,6 +33,8 @@ export interface BonusSummary {
   collected: ArtifactDrop[];
   retriggers: number;
   finalMultiplier: number;
+  /** True when the round win cap ended the bonus early. */
+  capped?: boolean;
 }
 
 export function freeSpinsFor(scatters: number): number {
@@ -47,6 +52,8 @@ export function startBonus(bet: number, spins: number): BonusState {
     ledgers: 0,
     feathers: 0,
     sigils: [],
+    sticky: false,
+    stickyCells: [],
     collected: [],
     retriggers: 0,
   };
@@ -66,6 +73,7 @@ export function rollArtifact(rng: Rng, b: BonusState): ArtifactDrop | undefined 
   const commons = symbolsOfRarity('common').filter((s) => !b.sigils.some((g) => g.from === s));
   if (kind === 'raven_feather' && b.feathers >= FEATURE_CONFIG.maxWildFeathers) kind = 'ledger';
   if (kind === 'eye_sigil' && commons.length === 0) kind = 'ledger';
+  if (kind === 'iron_shackles' && b.sticky) kind = 'ledger';
   if (kind === 'eye_sigil') {
     const premium = symbolsOfRarity('premium');
     return { kind, from: commons[rng.int(commons.length)], to: premium[rng.int(premium.length)] };
@@ -76,7 +84,7 @@ export function rollArtifact(rng: Rng, b: BonusState): ArtifactDrop | undefined 
 
 /** Apply a collected artifact to the bonus state (returns a new state). */
 export function applyArtifact(b: BonusState, a: ArtifactDrop): BonusState {
-  const next: BonusState = { ...b, collected: [...b.collected, a], sigils: b.sigils.slice() };
+  const next: BonusState = { ...b, collected: [...b.collected, a], sigils: b.sigils.slice(), stickyCells: b.stickyCells.slice() };
   switch (a.kind) {
     case 'ledger':
       next.ledgers += 1;
@@ -91,8 +99,27 @@ export function applyArtifact(b: BonusState, a: ArtifactDrop): BonusState {
     case 'eye_sigil':
       if (a.from && a.to) next.sigils.push({ from: a.from, to: a.to });
       break;
+    case 'iron_shackles':
+      next.sticky = true;
+      break;
   }
   return next;
+}
+
+/**
+ * Iron Shackles rule: once collected, every Wild on the final grid of a free
+ * spin is locked for the rest of the bonus (up to `maxStickyWilds`, earliest first).
+ */
+export function lockStickyWilds(b: BonusState, finalGrid: Grid): BonusState {
+  if (!b.sticky) return b;
+  const cells = b.stickyCells.slice();
+  finalGrid.forEach((col, reel) =>
+    col.forEach((s, row) => {
+      if (s !== 'wild' || cells.length >= FEATURE_CONFIG.maxStickyWilds) return;
+      if (!cells.some((c) => c.reel === reel && c.row === row)) cells.push({ reel, row });
+    }),
+  );
+  return { ...b, stickyCells: cells };
 }
 
 export function summarise(b: BonusState): BonusSummary {

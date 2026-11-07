@@ -1,7 +1,12 @@
 /**
  * Monte-Carlo simulation of the full game loop (base game + bonuses).
  * Results are SIMULATION ESTIMATES of uncalibrated prototype math only.
+ *
+ * Every paid spin is one "round" (the base spin plus any bonus it triggers).
+ * RTP's 95% confidence interval uses the per-round standard deviation:
+ *   CI = RTP ± 1.96 · σ / √N    (σ in units of the bet)
  */
+import { FEATURE_CONFIG } from '../config/game';
 import { SlotEngine } from './game';
 
 export interface SimulationReport {
@@ -10,18 +15,35 @@ export interface SimulationReport {
   totalWagered: number;
   totalWon: number;
   rtp: number;
+  rtpCi95: [number, number];
   baseRtp: number;
   bonusRtp: number;
+  /** Standard deviation of a round's return, in bets — a common volatility index. */
+  stdDev: number;
   hitFrequency: number;
   bonusFrequency: number;
   bonusesTriggered: number;
   avgBonusWin: number;
   crateFrequency: number;
   dealerHandFrequency: number;
+  potionFrequency: number;
   maxWinX: number;
+  cappedRounds: number;
+  /** Share of rounds by win size (× bet). */
+  distribution: { label: string; share: number }[];
 }
 
-/** Simulate `spins` paid base spins (free spins are played out but not counted as paid spins). */
+const BUCKETS: [string, number, number][] = [
+  ['0×', 0, 0],
+  ['< 1×', 1e-9, 1],
+  ['1–5×', 1, 5],
+  ['5–20×', 5, 20],
+  ['20–100×', 20, 100],
+  ['100–1,000×', 100, 1000],
+  ['≥ 1,000×', 1000, Infinity],
+];
+
+/** Simulate `spins` paid base spins (free spins are played out inside each round). */
 export function runSimulation(spins: number, seed = 12345): SimulationReport {
   const bet = 100;
   const engine = new SlotEngine({ seed, balance: 2 ** 50 });
@@ -32,53 +54,76 @@ export function runSimulation(spins: number, seed = 12345): SimulationReport {
   let bonuses = 0;
   let crates = 0;
   let hands = 0;
+  let potions = 0;
+  let allSpins = 0;
   let maxWin = 0;
-  let featureSpins = 0;
-  let currentBonus = 0;
+  let capped = 0;
+  let sumX = 0;
+  let sumX2 = 0;
+  const counts = new Array(BUCKETS.length).fill(0);
 
-  for (let i = 0; i < spins; i++) {
-    const o = engine.spin();
-    baseWon += o.result.totalWin;
-    if (o.result.totalWin > 0) hits++;
-    featureSpins++;
+  const tally = (o: ReturnType<SlotEngine['spin']>) => {
+    allSpins++;
     for (const s of o.result.steps) {
       if (s.type === 'crate') crates++;
       if (s.type === 'dealer_hand') hands++;
+      if (s.type === 'potion') potions++;
     }
-    let roundWin = o.result.totalWin;
+  };
+
+  for (let i = 0; i < spins; i++) {
+    // Pick a random crate each time (offers are shuffled, so index 0 is a random pick).
+    const o = engine.spin();
+    tally(o);
+    baseWon += o.result.totalWin;
+    if (o.result.totalWin > 0) hits++;
+    let round = o.result.totalWin;
+    let wasCapped = o.result.capped;
     if (o.bonusTriggered) {
       bonuses++;
-      currentBonus = 0;
       while (engine.bonus) {
         const f = engine.spin();
-        featureSpins++;
-        for (const s of f.result.steps) {
-          if (s.type === 'crate') crates++;
-          if (s.type === 'dealer_hand') hands++;
-        }
-        currentBonus += f.result.totalWin;
+        tally(f);
+        bonusWon += f.result.totalWin;
+        round += f.result.totalWin;
+        wasCapped ||= f.result.capped;
       }
-      bonusWon += currentBonus;
-      roundWin += currentBonus;
     }
-    maxWin = Math.max(maxWin, roundWin);
+    if (wasCapped) capped++;
+    const x = round / bet;
+    sumX += x;
+    sumX2 += x * x;
+    maxWin = Math.max(maxWin, round);
+    const b = x === 0 ? 0 : BUCKETS.findIndex(([, lo, hi], k) => k > 0 && x >= lo && x < hi);
+    counts[b]++;
   }
 
   const wagered = spins * bet;
+  const rtp = (baseWon + bonusWon) / wagered;
+  const mean = sumX / spins;
+  const sd = Math.sqrt(Math.max(0, sumX2 / spins - mean * mean));
+  const half = (1.96 * sd) / Math.sqrt(spins);
   return {
     spins,
     seed,
     totalWagered: wagered,
     totalWon: baseWon + bonusWon,
-    rtp: (baseWon + bonusWon) / wagered,
+    rtp,
+    rtpCi95: [rtp - half, rtp + half],
     baseRtp: baseWon / wagered,
     bonusRtp: bonusWon / wagered,
+    stdDev: sd,
     hitFrequency: hits / spins,
     bonusFrequency: bonuses / spins,
     bonusesTriggered: bonuses,
     avgBonusWin: bonuses ? bonusWon / bonuses / bet : 0,
-    crateFrequency: crates / featureSpins,
-    dealerHandFrequency: hands / featureSpins,
+    crateFrequency: crates / allSpins,
+    dealerHandFrequency: hands / allSpins,
+    potionFrequency: potions / allSpins,
     maxWinX: maxWin / bet,
+    cappedRounds: capped,
+    distribution: BUCKETS.map(([label], k) => ({ label, share: counts[k] / spins })),
   };
 }
+
+export const WIN_CAP_X = FEATURE_CONFIG.maxWinX;
