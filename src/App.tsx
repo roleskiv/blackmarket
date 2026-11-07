@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BET_LEVELS, FEATURE_CONFIG, STARTING_BALANCE } from './config/game';
 import { TIMING } from './config/visual';
@@ -16,10 +17,11 @@ import { celebrateCells, countUp } from './animations/winEffects';
 import { introCrates, openCrate, closeCrates } from './animations/crateAnimation';
 import { playDealerHand } from './animations/dealerAnimation';
 import { playVault } from './animations/vaultAnimation';
+import { travelBoard } from './animations/travelAnimation';
 import { Backdrop } from './components/Backdrop';
 import { TopBar } from './components/TopBar';
 import { Dealer, type DealerHandle } from './components/Dealer';
-import { ReelGrid, cellKey, type CellState, type ReelGridHandle } from './components/ReelGrid';
+import { ReelGrid, type LineFocus, cellKey, type CellState, type ReelGridHandle } from './components/ReelGrid';
 import { Controls } from './components/Controls';
 import { CrateOverlay, DealerHandOverlay, PotionIcon, VaultOverlay, type CrateReveal } from './components/Overlays';
 import { ArtifactToast, BonusHud, BonusSummaryModal, artifactDef } from './components/Bonus';
@@ -77,7 +79,8 @@ export default function App() {
   const [win, setWin] = useState(0);
   const [cellStates, setCellStates] = useState<Record<string, CellState>>({});
   const [lines, setLines] = useState<number[]>([]);
-  const [cycle, setCycle] = useState<{ line: number; cells: string[] }[]>([]);
+  const [cycle, setCycle] = useState<LineFocus[]>([]);
+  const [focus, setFocus] = useState<LineFocus | null>(null);
   const [crateReveal, setCrateReveal] = useState<CrateReveal | null>(null);
   const [cratePassed, setCratePassed] = useState<(string | null)[]>([null, null, null]);
   const [crateChoosing, setCrateChoosing] = useState(false);
@@ -107,6 +110,8 @@ export default function App() {
   const crateRef = useRef<HTMLDivElement>(null);
   const handRef = useRef<HTMLDivElement>(null);
   const vaultRef = useRef<HTMLDivElement>(null);
+  const travelRef = useRef<HTMLDivElement>(null);
+  const travelTitleRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const fxHost = useRef<HTMLDivElement>(null);
 
@@ -138,24 +143,33 @@ export default function App() {
     document.documentElement.classList.toggle('reduced-motion', settings.reducedMotion);
   }, [settings.sound, settings.musicVolume, settings.sfxVolume, settings.reducedMotion]);
 
-  // Idle win-line cycling (purely cosmetic).
+  // Win-line cycling (purely cosmetic): one line at a time, its symbols light up
+  // left to right in the line's colour and a plaque shows what that line paid.
   useEffect(() => {
-    if (cycle.length < 2) return;
+    if (cycle.length === 0) {
+      setFocus(null);
+      return;
+    }
     let i = 0;
-    const id = setInterval(() => {
+    const show = () => {
       const c = cycle[i % cycle.length];
       const states: Record<string, CellState> = {};
       for (let r = 0; r < 5; r++) for (let w = 0; w < 4; w++) states[cellKey(r, w)] = 'dim';
-      c.cells.forEach((k) => (states[k] = 'win'));
       setCellStates(states);
       setLines([c.line]);
+      setFocus(c);
+      if (i < cycle.length) audio.play('win_small', { volume: 0.18, rate: 1.1 + (i % 6) * 0.07 });
       i++;
-    }, TIMING.winLinePause * 1000);
+    };
+    show();
+    if (cycle.length < 2) return;
+    const id = setInterval(show, TIMING.winLinePause * 1000);
     return () => clearInterval(id);
   }, [cycle]);
 
   const clearHighlights = () => {
     setCycle([]);
+    setFocus(null);
     setCellStates({});
     setLines([]);
     setMultiplier(1);
@@ -334,7 +348,7 @@ export default function App() {
       if (x >= 5) dealer.current?.react('win');
       await countUp(0, r.totalWin, s.turbo ? 0.3 : Math.min(1.6, 0.4 + x * 0.12), (v) => setWin(startWin + v));
     }
-    setCycle(r.lineWins.map((w) => ({ line: w.line, cells: w.cells.map((c) => cellKey(c.reel, c.row)) })));
+    setCycle(r.lineWins.map((w) => ({ line: w.line, win: w.win, cells: w.cells.map((c) => cellKey(c.reel, c.row)) })));
   };
 
   const flyArtifact = async (a: ArtifactDrop) => {
@@ -348,6 +362,22 @@ export default function App() {
     await skipper.wait(settingsRef.current.turbo ? 0.6 : 1.4);
     setToast(null);
   };
+
+  /** A cosmetic, scatter-free grid to show on a board you have just arrived at. */
+  const freshGrid = (): Grid => generateGrid(createRng((Math.random() * 2 ** 31) | 0)).map((c) => c.map((s) => (s === 'scatter' ? 'club' : s)));
+
+  // ── Travel between the market board and the vault board ────────────────
+  const travelToBoard = (to: 'vault' | 'market', swap: () => void) =>
+    travelBoard(
+      {
+        overlay: travelRef.current!,
+        title: travelTitleRef.current!,
+        stage: stageRef.current!,
+        board: () => document.querySelector<HTMLElement>('.reel-frame'),
+      },
+      () => flushSync(swap),
+      { to, reducedMotion: settingsRef.current.reducedMotion, label: to === 'vault' ? 'INTO THE VAULT' : 'BACK TO THE MARKET' },
+    );
 
   // ── Vault cinematic (triggered or bought) ──────────────────────────────
   const openVault = async (spins: number, b: BonusState) => {
@@ -368,11 +398,16 @@ export default function App() {
     );
     clearHighlights();
     b = (await chooseDeal()) ?? b;
-    setBonus(b);
-    showTip('vault');
-    setBonusWin(0);
-    setWin(0);
+    const chosen = b;
+    skipper.reset();
     audio.playMusic('bonus_music');
+    await travelToBoard('vault', () => {
+      reels.current?.setGrid(freshGrid());
+      setBonus(chosen);
+      setBonusWin(0);
+      setWin(0);
+    });
+    showTip('vault');
   };
 
   // ── Bonus buy: the engine debits the price and opens the vault ──────────
@@ -516,10 +551,15 @@ export default function App() {
         if (autoRef.current !== null) setTimeout(resolve, 5000);
       });
       setSummary(null);
-      setBonus(null);
-      setWin(o.bonusEnded.totalWin);
-      audio.play('transition');
+      skipper.reset();
       audio.playMusic('ambience');
+      const total = o.bonusEnded.totalWin;
+      await travelToBoard('market', () => {
+        clearHighlights();
+        reels.current?.setGrid(freshGrid());
+        setBonus(null);
+        setWin(total);
+      });
     }
 
     setHistoryTick((t) => t + 1);
@@ -639,7 +679,7 @@ export default function App() {
               </div>
             )}
             <div className="reels-wrap">
-              <ReelGrid ref={reels} initial={initialGrid} cellStates={cellStates} lines={lines} spinning={busy} bonus={inBonus} potions={potions} stickyCells={bonus?.stickyCells ?? []} />
+              <ReelGrid ref={reels} initial={initialGrid} cellStates={cellStates} lines={lines} spinning={busy} bonus={inBonus} potions={potions} stickyCells={bonus?.stickyCells ?? []} focus={focus} />
               {multiplier > 1 && (
                 <div className="mult-badge">
                   <PotionIcon value={multiplier} />
@@ -707,13 +747,16 @@ export default function App() {
         onPick={(i) => cratePickResolve.current?.(i)}
       />
       <VaultOverlay ref={vaultRef} spins={vaultSpins} />
+      <div className="travel-overlay" ref={travelRef} aria-hidden>
+        <div className="travel-title" ref={travelTitleRef} />
+      </div>
       {banner && <WinBanner tier={banner.tier} amount={banner.amount} onSkip={() => skipper.skip()} />}
       {toast && (
         <div className="toast-wrap">
           <ArtifactToast kind={toast.kind} detail={toast.kind === 'eye_sigil' && toast.from && toast.to ? `Every ${SYMBOLS[toast.from].name} now lands as a ${SYMBOLS[toast.to].name}.` : undefined} />
         </div>
       )}
-      {(busy || banner) && !dealOffer && <button className="skip-btn" onClick={() => skipper.skip()}>Skip ▸▸</button>}
+      {(busy || banner) && !dealOffer && !tip && <button className="skip-btn" onClick={() => skipper.skip()}>Skip ▸▸</button>}
       {summary && <BonusSummaryModal summary={summary} onClose={() => summaryResolve.current?.()} />}
       {showSettings && (
         <SettingsPanel

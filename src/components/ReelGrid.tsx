@@ -5,10 +5,18 @@ import { SYMBOLS, type SymbolId } from '../config/symbols';
 import { PAYLINES, PAYLINE_COLORS } from '../config/paylines';
 import type { Cell, CellChange, Grid, Potion } from '../engine/types';
 import { PotionIcon } from './Overlays';
+import { formatCredits } from './format';
 import { SymbolImage } from './SymbolImage';
 import { spinReel, landReel, fadeSwapReel, clearStrip, thumpReel } from '../animations/reelAnimation';
 import { transformCells } from '../animations/winEffects';
 import { skipper } from '../animations/skip';
+
+/** One payline being presented: its cells light up in sequence and a plaque shows its win. */
+export interface LineFocus {
+  line: number;
+  win: number;
+  cells: string[];
+}
 
 export type CellState = 'win' | 'dim' | 'changed' | 'scatter' | 'target' | undefined;
 
@@ -37,11 +45,12 @@ interface Props {
   bonus: boolean;
   potions: Potion[];
   stickyCells: Cell[];
+  focus?: LineFocus | null;
 }
 
 export const cellKey = (reel: number, row: number) => `${reel}-${row}`;
 
-export const ReelGrid = forwardRef<ReelGridHandle, Props>(function ReelGrid({ initial, cellStates, lines, spinning, bonus, potions, stickyCells }, ref) {
+export const ReelGrid = forwardRef<ReelGridHandle, Props>(function ReelGrid({ initial, cellStates, lines, spinning, bonus, potions, stickyCells, focus }, ref) {
   const [grid, setGrid] = useState<Grid>(initial);
   const gridRef = useRef(grid);
   gridRef.current = grid;
@@ -130,12 +139,13 @@ export const ReelGrid = forwardRef<ReelGridHandle, Props>(function ReelGrid({ in
                   const st = cellStates[cellKey(reel, row)];
                   const potion = potions.find((p) => p.cell.reel === reel && p.cell.row === row);
                   const sticky = stickyCells.some((c) => c.reel === reel && c.row === row);
+                  const linked = !!focus?.cells.includes(cellKey(reel, row));
                   return (
                     <div
-                      key={row}
+                      key={linked ? `${row}-link-${focus!.line}` : row}
                       ref={(el) => (cellRefs.current[cellKey(reel, row)] = el)}
-                      className={`cell rarity-${SYMBOLS[id].rarity} ${st ? `cell-${st}` : ''} sym-${id} ${sticky ? 'is-sticky' : ''}`}
-                      style={{ ['--glow' as string]: SYMBOLS[id].glow }}
+                      className={`cell rarity-${SYMBOLS[id].rarity} ${st && !linked ? `cell-${st}` : ''} ${linked ? 'cell-link' : ''} sym-${id} ${sticky ? 'is-sticky' : ''}`}
+                      style={{ ['--glow' as string]: SYMBOLS[id].glow, ['--d' as string]: `${reel * 0.07}s`, ['--line' as string]: focus ? PAYLINE_COLORS[focus.line] : undefined }}
                     >
                       <div className="cell-glow" />
                       <SymbolImage id={id} />
@@ -155,15 +165,27 @@ export const ReelGrid = forwardRef<ReelGridHandle, Props>(function ReelGrid({ in
           <svg className="payline-overlay" viewBox="0 0 500 400" preserveAspectRatio="none">
             {lines.map((li, i) => {
               const pts = PAYLINES[li].map((row, reel) => `${reel * 100 + 50},${row * 100 + 50}`).join(' ');
-              const delay = { animationDelay: `${Math.min(i, 8) * 0.09}s` };
+              const delay = { animationDelay: `${Math.min(i, 8) * 0.07}s` };
               return (
-                <g key={li} style={{ color: PAYLINE_COLORS[li] }}>
+                <g key={`${li}-${focus?.line ?? 'all'}`} style={{ color: PAYLINE_COLORS[li] }}>
                   <polyline points={pts} stroke={PAYLINE_COLORS[li]} className="payline-draw" pathLength={100} style={delay} />
-                  <polyline points={pts} stroke={PAYLINE_COLORS[li]} className="payline" style={delay} />
+                  <polyline points={pts} className="payline-core" pathLength={100} style={delay} />
                 </g>
               );
             })}
           </svg>
+          {focus && (() => {
+            const last = focus.cells[focus.cells.length - 1].split('-').map(Number);
+            return (
+              <div
+                key={`plaque-${focus.line}`}
+                className="line-plaque"
+                style={{ left: `${((last[0] + 0.5) / REELS) * 100}%`, top: `${((last[1] + 0.5) / ROWS) * 100}%`, ['--line' as string]: PAYLINE_COLORS[focus.line] }}
+              >
+                {formatCredits(focus.win)}
+              </div>
+            );
+          })()}
         </div>
       </div>
       <div className="frame-corner tl" />

@@ -4,6 +4,7 @@
  * scales crisply on any screen.
  */
 import { memo } from 'react';
+import { VaultBackdrop } from './VaultBackdrop';
 
 const Jar = ({ x, y, c }: { x: number; y: number; c: string }) => (
   <g transform={`translate(${x} ${y})`}>
@@ -125,6 +126,7 @@ export const Backdrop = memo(function Backdrop({ bonus }: { bonus: boolean }) {
           <text x="0" y="5" textAnchor="middle" fontFamily="Cinzel, serif" fontSize="20" fill="#d9a6ff" letterSpacing="4">CURIOS</text>
         </g>
       </svg>
+      {bonus && <VaultBackdrop />}
       <div className="smoke smoke-1" />
       <div className="smoke smoke-2" />
       <div className="vignette" />
