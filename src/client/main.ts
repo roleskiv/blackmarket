@@ -98,6 +98,7 @@ async function boot(): Promise<void> {
     'click',
     () => {
       sound.unlock();
+      enter.blur();
       sound.setMusic('market');
       const loading = $('loading');
       loading.classList.add('loading--out');

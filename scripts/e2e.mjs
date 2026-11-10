@@ -31,24 +31,28 @@ async function open(viewport, query) {
   await page.goto(base + query);
   await page.waitForSelector('#enter:not([hidden])', { timeout: 30_000 });
   await page.click('#enter');
-  await page.waitForSelector('[data-id=spin][data-mode=spin]', { timeout: 30_000 });
+  await page.waitForSelector('#loading', { state: 'detached', timeout: 60_000 });
+  await page.waitForSelector('[data-id=spin][data-mode=spin]', { timeout: 60_000 });
   // Headless rendering is slow: run the presentation faster than real time.
-  await page.evaluate(() => (window.__bm.scene.timeScale = 6));
+  await page.evaluate(() => (window.__bm.scene.timeScale = 40));
   return { page, errors };
 }
-const idle = (page) => page.waitForSelector('[data-id=spin][data-mode=spin]', { timeout: 240_000 });
+/** Waits until a round started after `stakedBefore` has been shown to the end. */
+const roundDone = (page, stakedBefore) =>
+  page.waitForFunction((s) => window.__bm.game.staked > s && !window.__bm.game.busy, stakedBefore, { timeout: 420_000, polling: 50 });
+const staked = (page) => page.evaluate(() => window.__bm.game.staked);
 const state = (page) => page.evaluate(() => ({ balance: window.__bm.game.balance, bet: window.__bm.game.bet }));
 
 try {
   // 1. Desktop: spins reconcile with the round history.
   {
-    const { page, errors } = await open({ width: 1280, height: 720 }, '?seed=11');
+    const { page, errors } = await open({ width: 640, height: 360 }, '?seed=11');
     const before = await state(page);
     const spins = 6;
     for (let i = 0; i < spins; i++) {
+      const s = await staked(page);
       await page.keyboard.press('Space');
-      await page.waitForSelector('[data-id=spin]:not([data-mode=spin])', { timeout: 10_000 });
-      await idle(page);
+      await roundDone(page, s);
     }
     const after = await state(page);
     const history = await page.evaluate(() => window.__bm.game.service.history(50));
@@ -62,7 +66,7 @@ try {
 
   // 2. Forced Vault trigger: the feature runs to the end and pays what the server said.
   {
-    const { page, errors } = await open({ width: 1280, height: 720 }, '?seed=5');
+    const { page, errors } = await open({ width: 640, height: 360 }, '?seed=5');
     const before = await state(page);
     await page.evaluate(() => {
       const SCATTER = 13;
@@ -71,8 +75,9 @@ try {
       const stops = strips.map((s, i) => (i < 3 ? s.indexOf(SCATTER) : 0));
       window.__bm.force(stops);
     });
+    const s = await staked(page);
     await page.keyboard.press('Space');
-    await idle(page);
+    await roundDone(page, s);
     const [last] = await page.evaluate(() => window.__bm.game.service.history(1));
     const after = await state(page);
     check(last.outcome.steps.length > 10, `Vault feature ran (${last.outcome.steps.length - 1} free spins)`);
@@ -84,8 +89,9 @@ try {
   // 3. Phone portrait: loads, spins, opens the paytable.
   {
     const { page, errors } = await open({ width: 390, height: 844 }, '?seed=3');
+    const s = await staked(page);
     await page.click('[data-id=spin]');
-    await idle(page);
+    await roundDone(page, s);
     await page.click('[data-id=menu]');
     await page.waitForSelector('#dialogs [role=dialog]', { timeout: 10_000 });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
