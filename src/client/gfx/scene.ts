@@ -67,6 +67,18 @@ export class Scene {
   private bigRays!: Sprite;
   private bigTitle!: Text;
   private bigAmount!: Text;
+  private readonly tensionDim = new Graphics();
+  private readonly flashG = new Graphics();
+  /** Screen-space effects drawn above everything else. */
+  private readonly fx = new Container();
+  private zoom = 1;
+  private zoomTarget = 1;
+  private tension = 0;
+  private tensionTarget = 0;
+  private rain = 0;
+  private rainAcc = 0;
+  private amountPunch = 0;
+  private bigS = 1;
   private vault = false;
   private shakeAmp = 0;
   private worldX = 0;
@@ -95,6 +107,9 @@ export class Scene {
     this.app.canvas.setAttribute('aria-hidden', 'true');
     this.app.stage.addChild(this.bg, this.world, this.screen);
     this.buildBackground();
+    this.tensionDim.rect(0, 0, 2048, 2048).fill(0x05010a);
+    this.tensionDim.alpha = 0;
+    this.bg.addChild(this.tensionDim);
     this.buildWorld();
     this.buildScreen();
     this.app.ticker.add((ticker) => this.update(Math.min(ticker.deltaMS, 100) * this.timeScale));
@@ -284,7 +299,8 @@ export class Scene {
       x.visible = false;
     }
     this.doorL.visible = this.doorR.visible = false;
-    this.screen.addChild(this.bigWin, this.doorL, this.doorR, this.doorTitle, this.doorSub, this.doorAmount);
+    this.flashG.alpha = 0;
+    this.screen.addChild(this.bigWin, this.doorL, this.doorR, this.doorTitle, this.doorSub, this.doorAmount, this.fx, this.flashG);
   }
 
   // ── Layout ──────────────────────────────────────────────────────────────
@@ -320,7 +336,9 @@ export class Scene {
 
     // Full-screen pieces.
     this.bigDim.clear().rect(0, 0, w, h).fill({ color: 0x05020a, alpha: 0.72 });
+    this.flashG.clear().rect(0, 0, w, h).fill(0xffffff);
     const s = Math.min(w / 1100, h / 900);
+    this.bigS = s;
     this.bigRays.position.set(w / 2, h * 0.45);
     this.bigRays.scale.set((Math.max(w, h) / 512) * 1.5);
     this.bigTitle.position.set(w / 2, h * 0.36);
@@ -374,16 +392,131 @@ export class Scene {
       if (rays) rays.rotation = t * 0.25;
       if (this.bigWin.visible) this.bigRays.rotation = t * 0.18;
     }
+    // Tension: a slow push-in on the reels and darker surroundings.
+    const lerp = Math.min(1, dt * 0.006);
+    this.zoom += (this.zoomTarget - this.zoom) * lerp;
+    this.tension += (this.tensionTarget - this.tension) * lerp;
+    this.tensionDim.alpha = this.tension;
+    const ws = this.scale * this.zoom;
+    this.world.scale.set(ws);
+    let px = this.worldX - (REEL_W * (ws - this.scale)) / 2;
+    let py = this.worldY - (REEL_H * (ws - this.scale)) / 2;
     if (this.shakeAmp > 0.2) {
-      this.world.position.set(
-        this.worldX + (Math.random() - 0.5) * this.shakeAmp,
-        this.worldY + (Math.random() - 0.5) * this.shakeAmp,
-      );
+      px += (Math.random() - 0.5) * this.shakeAmp;
+      py += (Math.random() - 0.5) * this.shakeAmp;
       this.shakeAmp *= Math.pow(0.0015, dt / 1000);
-    } else if (this.shakeAmp !== 0) {
+    } else {
       this.shakeAmp = 0;
-      this.world.position.set(this.worldX, this.worldY);
     }
+    this.world.position.set(px, py);
+
+    if (this.bigWin.visible) {
+      // Coins rain from the top for as long as the count is running.
+      if (this.rain > 0) {
+        this.rainAcc += dt * (0.01 + 0.012 * this.rain);
+        const k = Math.min(this.viewW, this.viewH) / 800;
+        while (this.rainAcc >= 1) {
+          this.rainAcc -= 1;
+          this.screenParticles.burst(Math.random() * this.viewW, -30, {
+            texture: this.tex.coin,
+            count: 1,
+            speed: [150 * k, 520 * k],
+            angle: Math.PI / 2,
+            spread: 0.5,
+            gravity: 1100 * k,
+            life: [1700, 2600],
+            scale: [0.4 * k, 0.8 * k],
+            endScale: 1,
+            spin: 8,
+            fadeIn: 0.02,
+          });
+        }
+      }
+      this.amountPunch *= Math.pow(0.002, dt / 1000);
+      const raw = Math.max(1, this.bigAmount.width / this.bigAmount.scale.x);
+      const fit = Math.min(1, (this.viewW * 0.9) / raw / this.bigS);
+      this.bigAmount.scale.set(this.bigS * fit * (1 + this.amountPunch));
+    }
+  }
+
+  /** 0 = calm. Higher levels push in and darken the surroundings. */
+  setTension(level: number): void {
+    this.tensionTarget = Math.min(0.55, level * 0.24);
+    this.zoomTarget = this.reducedMotion ? 1 : 1 + Math.min(3, level) * 0.018;
+  }
+
+  /** Brief full-screen flash. */
+  screenFlash(alpha = 0.7, ms = 300, color = 0xffffff): void {
+    const a = this.reducedMotion ? alpha * 0.25 : alpha;
+    this.flashG.tint = color;
+    this.flashG.alpha = a;
+    void this.anim.run(ms, (t) => (this.flashG.alpha = a * (1 - t) * (1 - t)), true);
+  }
+
+  /** Expanding shockwave ring in screen pixels. */
+  ring(x: number, y: number, tint: number, size: number, ms = 650): void {
+    if (this.reducedMotion) return;
+    const r = new Sprite(this.tex.ring);
+    r.anchor.set(0.5);
+    r.position.set(x, y);
+    r.tint = tint;
+    r.blendMode = 'add';
+    this.fx.addChild(r);
+    void this.anim
+      .run(
+        ms,
+        (t) => {
+          r.scale.set((size / 256) * (0.15 + 0.85 * ease.outCubic(t)));
+          r.alpha = (1 - t) * (1 - t);
+        },
+        true,
+      )
+      .then(() => r.destroy());
+  }
+
+  /** Shockwave centred on a reel cell. */
+  cellRing(reel: number, row: number, tint: number, cells = 3): void {
+    const c = this.reels.cellCenter(reel, row);
+    const p = this.toScreen(c.x, c.y);
+    this.ring(p.x, p.y, tint, this.cell * cells);
+  }
+
+  /**
+   * Sends a glowing orb from each cell to a point on screen (the win meter),
+   * so the player sees where the money goes. Resolves when the first lands.
+   */
+  flyToScreen(cells: Array<[number, number]>, sx: number, sy: number, tint: number): Promise<void> {
+    if (this.reducedMotion || !cells.length) return Promise.resolve();
+    const k = this.scale;
+    const flights = cells.slice(0, 10).map(async ([r, row], i) => {
+      const c = this.reels.cellCenter(r, row);
+      const from = this.toScreen(c.x, c.y);
+      const orb = new Sprite(this.tex.glow);
+      orb.anchor.set(0.5);
+      orb.blendMode = 'add';
+      orb.tint = tint;
+      orb.scale.set(0.55 * k);
+      orb.position.set(from.x, from.y);
+      orb.alpha = 0;
+      this.fx.addChild(orb);
+      await this.anim.run(i * 35, () => undefined, true);
+      const cx = from.x + (sx - from.x) * 0.3 + (i % 2 ? 90 : -90) * k;
+      const cy = from.y - 120 * k;
+      await this.anim.run(
+        430,
+        (t) => {
+          const e = ease.inQuad(t);
+          const a = (1 - e) * (1 - e);
+          const b = 2 * (1 - e) * e;
+          orb.position.set(a * from.x + b * cx + e * e * sx, a * from.y + b * cy + e * e * sy);
+          orb.alpha = Math.min(1, t * 5);
+          orb.scale.set(0.55 * k * (1 - 0.5 * e));
+        },
+        true,
+      );
+      orb.destroy();
+    });
+    return Promise.race(flights);
   }
 
   shake(strength: number): void {
@@ -456,6 +589,29 @@ export class Scene {
     });
     await this.anim.run(320, (t) => this.meterMedal.scale.set(1 + 0.35 * (1 - ease.outElastic(t))));
     this.meterMedal.scale.set(1);
+  }
+
+  /** Milestone flourish on the multiplier medal. */
+  medalBurst(text: string): void {
+    const p = this.toScreen(this.meterMedal.x, this.meterMedal.y);
+    this.ring(p.x, p.y, 0xffd977, this.cell * 7, 800);
+    this.ring(p.x, p.y, 0xffffff, this.cell * 4, 550);
+    this.screenFlash(0.22, 300, 0xffd977);
+    this.shake(10);
+    const t = new Text({ text, style: goldText(96) });
+    t.anchor.set(0.5);
+    t.position.set(REEL_W / 2, REEL_H / 2);
+    this.reels.overlay.addChild(t);
+    void this.anim
+      .run(
+        1000,
+        (k) => {
+          t.scale.set(0.5 + 1.1 * ease.outBack(Math.min(1, k * 3)));
+          t.alpha = k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4;
+        },
+        true,
+      )
+      .then(() => t.destroy());
   }
 
   /** Small caption that rises from a cell (e.g. "+1 SPIN"). */
@@ -547,22 +703,70 @@ export class Scene {
   showBigWin(tier: WinTier, amount: string): void {
     this.bigWin.visible = true;
     this.bigWin.alpha = 1;
-    this.setBigWin(tier, amount, true);
+    this.bigDim.alpha = 0;
+    void this.anim.tween(this.bigDim, { alpha: 1 }, 220);
+    this.bigTitle.text = '';
+    this.setBigWin(tier, amount);
   }
 
-  setBigWin(tier: WinTier, amount: string, pop = false): void {
+  /** Updates the celebration. A new tier slams its title in with a shockwave. */
+  setBigWin(tier: WinTier, amount: string): void {
     const title = TIER_TITLES[tier];
     const changed = this.bigTitle.text !== title;
     this.bigTitle.text = title;
     this.bigAmount.text = amount;
-    this.bigRays.tint = [0xffb347, 0xffb347, 0xff7ad9, 0xb98cff][tier];
-    if (changed || pop) {
-      const s = Math.min(this.viewW / 1100, this.viewH / 900);
-      const fit = Math.min(1, (this.viewW * 0.92) / Math.max(1, this.bigTitle.width / this.bigTitle.scale.x) / s);
-      void this.anim.run(420, (t) => this.bigTitle.scale.set(s * fit * (0.4 + 0.6 * ease.outElastic(t))), true);
-      this.shake(8 + tier * 6);
-      this.coinBurst(30 + tier * 20);
-    }
+    if (!changed) return;
+    const tint = [0xffb347, 0xffb347, 0xff7ad9, 0xb98cff][tier];
+    this.bigRays.tint = tint;
+    this.bigRays.alpha = 0.3 + tier * 0.08;
+    this.rain = tier;
+    const s = this.bigS;
+    const fit = Math.min(1, (this.viewW * 0.92) / Math.max(1, this.bigTitle.width / this.bigTitle.scale.x) / s);
+    const big = this.reducedMotion ? 1.15 : 2.6;
+    void this.anim.run(
+      460,
+      (t) => {
+        // Drop in oversized, hit, then settle.
+        const k = t < 0.4 ? big + (0.9 - big) * ease.inCubic(t / 0.4) : 0.9 + 0.1 * ease.outBack((t - 0.4) / 0.6);
+        this.bigTitle.scale.set(s * fit * k);
+        this.bigTitle.alpha = Math.min(1, t * 5);
+      },
+      true,
+    );
+    void this.anim.run(180, () => undefined, true).then(() => {
+      if (!this.bigWin.visible) return;
+      this.shake(10 + tier * 7);
+      this.screenFlash(0.22 + tier * 0.08, 320, tint);
+      this.ring(this.bigTitle.x, this.bigTitle.y, tint, Math.max(this.viewW, this.viewH) * (0.9 + tier * 0.25), 800);
+      this.coinBurst(26 + tier * 22);
+      this.amountPunch = 0.2;
+    });
+  }
+
+  /** Tiny kick on the amount, called as the count ticks. */
+  bumpAmount(): void {
+    if (!this.reducedMotion) this.amountPunch = Math.max(this.amountPunch, 0.035);
+  }
+
+  /** The count has landed on the final amount. */
+  bigWinFinale(): void {
+    this.rain = 0;
+    this.amountPunch = this.reducedMotion ? 0 : 0.4;
+    const tint = this.bigRays.tint;
+    this.ring(this.bigAmount.x, this.bigAmount.y, 0xffffff, Math.max(this.viewW, this.viewH) * 1.2, 900);
+    this.ring(this.bigAmount.x, this.bigAmount.y, tint, Math.max(this.viewW, this.viewH) * 0.7, 700);
+    this.screenFlash(0.3, 380);
+    this.shake(16);
+    this.coinBurst(70);
+    this.screenParticles.burst(this.bigAmount.x, this.bigAmount.y, {
+      texture: this.tex.spark,
+      count: 40,
+      tints: [0xffd977, 0xffffff, tint],
+      speed: [200, 900],
+      life: [500, 1200],
+      scale: [0.3, 0.9],
+      additive: true,
+    });
   }
 
   coinBurst(count: number): void {
@@ -585,6 +789,7 @@ export class Scene {
   }
 
   async hideBigWin(): Promise<void> {
+    this.rain = 0;
     await this.anim.tween(this.bigWin, { alpha: 0 }, 300);
     this.bigWin.visible = false;
     this.screenParticles.clear();

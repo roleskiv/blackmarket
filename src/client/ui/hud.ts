@@ -104,6 +104,20 @@ export class Hud {
     this.el.win.parentElement!.classList.toggle('stat--lit', highlight);
   }
 
+  /** Centre of the win readout in viewport pixels. */
+  winPoint(): { x: number; y: number } {
+    const r = this.el.win.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+
+  /** Short kick on the win readout as winnings arrive. */
+  bumpWin(): void {
+    const box = this.el.win.parentElement!;
+    box.classList.remove('stat--bump');
+    void box.offsetWidth;
+    box.classList.add('stat--bump');
+  }
+
   setMessage(text: string): void {
     if (this.el.message.textContent !== text) this.el.message.textContent = text;
   }

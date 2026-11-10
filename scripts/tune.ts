@@ -26,6 +26,10 @@ const target = Number(arg('target', '0.961'));
 const iters = Number(arg('iters', '30000'));
 const seed = Number(arg('seed', '7'));
 const from = arg('from');
+/** Add this many Wilds to each of the middle Vault reels before searching. */
+const addFreeWilds = Number(arg('addFreeWilds', '0'));
+/** Keep the number of Wilds on the Vault reels fixed during the search. */
+const lockFreeWilds = process.argv.includes('--lockFreeWilds');
 
 // ── Starting point ────────────────────────────────────────────────────────
 function initialModel(): MathModel {
@@ -102,7 +106,7 @@ const TARGETS = {
   trigger: 1 / 215,
   waysShare: 0.615,
   fsSpins: 12.6,
-  fsMult: 7.5,
+  fsMult: 8.2,
 };
 
 function shapePenalty(model: MathModel): number {
@@ -258,7 +262,9 @@ function anneal(model: MathModel): MathModel {
       const j = rng.nextInt(strip.length);
       [strip[i], strip[j]] = [strip[j], strip[i]];
     }
-    if (stripViolations(strip, rulesFor(kind, r)) > 0) {
+    const wildsChanged =
+      lockFreeWilds && kind === 'free' && move < 4 && symbolCounts(strip)[WILD] !== symbolCounts(saved)[WILD];
+    if (wildsChanged || stripViolations(strip, rulesFor(kind, r)) > 0) {
       mode.strips[r] = saved;
       continue;
     }
@@ -345,6 +351,21 @@ export default ${constName};
 
 const start = from ? await loadModel(from) : initialModel();
 start.id = id;
+if (addFreeWilds > 0) {
+  const rng = new SeededRng(seed + 1);
+  for (let r = 1; r <= 3; r++) {
+    const strip = start.free.strips[r];
+    for (let added = 0, tries = 0; added < addFreeWilds && tries < 100000; tries++) {
+      const i = rng.nextInt(strip.length);
+      const n = strip.length;
+      if (strip[i] > 3 || strip[(i + 1) % n] === WILD || strip[(i + n - 1) % n] === WILD) continue;
+      const was = strip[i];
+      strip[i] = WILD;
+      if (stripViolations(strip, rulesFor('free', r)) > 0) strip[i] = was;
+      else added++;
+    }
+  }
+}
 report(start);
 const tuned = iters > 0 ? anneal(start) : start;
 if (iters > 0) report(tuned);

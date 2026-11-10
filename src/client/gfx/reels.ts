@@ -40,6 +40,8 @@ class Reel {
   /** Per-row visibility, so a winner can be drawn by an overlay instead. */
   readonly hidden = new Array<boolean>(ROWS).fill(false);
   dim = 1;
+  /** Speed multiplier while the reel is being teased. */
+  boost = 1;
 
   constructor(private readonly tex: GameTextures) {
     for (let i = 0; i <= ROWS; i++) {
@@ -85,7 +87,7 @@ class Reel {
         this.speed = Math.min(SPIN_SPEED, this.speed + dt * 190);
         if (this.speed >= SPIN_SPEED) this.state = 'running';
       }
-      this.pos = mod(this.pos - this.speed * dt, this.strip.length);
+      this.pos = mod(this.pos - this.speed * this.boost * dt, this.strip.length);
     }
     this.layout();
   }
@@ -98,8 +100,24 @@ export interface StopOptions {
   /** Extra spin time for reels that could still complete a scatter trigger. */
   anticipation: number;
   onReelStop: (reel: number, landed: number[]) => void;
-  onAnticipation: (reel: number) => void;
+  /** A reel starts its tease; `nth` counts teased reels this spin from 1. */
+  onAnticipation: (reel: number, nth: number, ms: number) => void;
+  /** A teased reel has landed. `hit` is true when it brought a Scatter. */
+  onAnticipationResult: (reel: number, hit: boolean, scatters: number) => void;
 }
+
+interface WinClone {
+  sprite: Sprite;
+  glow: Sprite;
+  rays: Sprite | null;
+  reel: number;
+  row: number;
+  /** Entrance scale factor, animated from small to 1. */
+  pop: number;
+}
+
+/** Symbols that get a ray burst behind them when they win. */
+const isPremium = (sym: number) => sym >= 8 && sym !== CRATE;
 
 export class ReelSet {
   readonly container = new Container();
@@ -110,8 +128,9 @@ export class ReelSet {
   private readonly reelLayer = new Container();
   private readonly glowLayer = new Container();
   private readonly teaseGlow: Sprite[] = [];
-  private winClones: Array<{ sprite: Sprite; glow: Sprite; reel: number; row: number }> = [];
+  private winClones: WinClone[] = [];
   private stopPulse: (() => void) | null = null;
+  private stopTease: (() => void) | null = null;
   /** Resolves any pending per-reel waits when the player slams the reels. */
   slam = false;
 
@@ -245,34 +264,95 @@ export class ReelSet {
   /** Brings the reels to rest on the given stops, left to right. */
   async stop(o: StopOptions): Promise<void> {
     let scatters = 0;
+    let teases = 0;
     const pending: Array<Promise<void>> = [];
     for (let r = 0; r < REELS; r++) {
       const reel = this.reels[r];
+      // Tease only while this reel can truly still add to a trigger.
       const tease = scatters >= 2 && o.anticipation > 0 && !this.slam;
       if (r > 0 && !this.slam) {
         if (tease) {
-          o.onAnticipation(r);
-          const glow = this.teaseGlow[r];
-          void this.anim.tween(glow, { alpha: 0.5 }, 250);
-          await this.waitOrSlam(o.anticipation);
-          void this.anim.tween(glow, { alpha: 0 }, 300);
+          // Let the earlier reels finish landing so the Scatters are in place.
+          await Promise.all(pending);
+          teases++;
+          const ms = o.anticipation + (teases - 1) * 350;
+          this.markScatters(r - 1);
+          o.onAnticipation(r, teases, ms);
+          this.beginTease(r, teases);
+          await this.waitOrSlam(ms);
+          this.endTease(r);
         } else {
           await this.waitOrSlam(o.stagger);
         }
       }
       const landed: number[] = [];
       for (let i = 0; i < ROWS; i++) landed.push(reel.strip[mod(o.stops[r] + i, reel.strip.length)]);
-      if (landed.includes(SCATTER)) scatters++;
+      const hit = landed.includes(SCATTER);
+      if (hit) scatters++;
+      const count = scatters;
       const p = this.stopReel(r, o.stops[r]).then(() => {
         o.onReelStop(r, landed);
         this.landingEffects(r, landed);
+        if (tease) o.onAnticipationResult(r, hit, count);
       });
       // With anticipation the next reel waits for this one to land.
       if (tease) await p;
       else pending.push(p);
     }
     await Promise.all(pending);
-    for (const g of this.teaseGlow) g.alpha = 0;
+    this.endTease(-1);
+    if (teases > 0) this.clearHighlight();
+  }
+
+  /** Keeps landed Scatters lit and the rest of the landed reels dim during a tease. */
+  private markScatters(upTo: number): void {
+    this.clearHighlight();
+    const cells: Array<[number, number]> = [];
+    for (let r = 0; r <= upTo; r++) {
+      const reel = this.reels[r];
+      reel.dim = 0.5;
+      for (let row = 0; row < ROWS; row++) if (reel.symbolAtRow(row) === SCATTER) cells.push([r, row]);
+    }
+    this.addClones(cells, SYMBOL_TINT[SCATTER], true, false);
+    for (const reel of this.reels) reel.layout();
+    this.startPulse(420, 0.1, false);
+  }
+
+  private beginTease(r: number, nth: number): void {
+    const reel = this.reels[r];
+    const glow = this.teaseGlow[r];
+    void this.anim.tween(reel, { boost: 1.25 + 0.15 * nth }, 300, ease.inQuad);
+    let acc = 0;
+    const stopLoop = this.anim.loop(360, (t) => {
+      glow.alpha = 0.45 + 0.3 * Math.sin(t * Math.PI);
+      // Embers streaming up the teased reel.
+      acc += 1;
+      if (acc % 2 === 0) {
+        this.particles.burst(r * CELL + CELL / 2, REEL_H, {
+          texture: this.tex.spark,
+          count: 1,
+          tints: [0xff2d6f, 0xffb347, 0xffffff],
+          speed: [500, 1100],
+          angle: -Math.PI / 2,
+          spread: 0.25,
+          life: [400, 800],
+          scale: [0.2, 0.55],
+          additive: true,
+          radius: CELL * 0.4,
+        });
+      }
+    });
+    this.stopTease = () => {
+      stopLoop();
+      reel.boost = 1;
+      void this.anim.tween(glow, { alpha: 0 }, 300);
+    };
+  }
+
+  private endTease(_r: number): void {
+    this.stopTease?.();
+    this.stopTease = null;
+    for (const reel of this.reels) reel.boost = 1;
   }
 
   private async waitOrSlam(ms: number): Promise<void> {
@@ -361,38 +441,96 @@ export class ReelSet {
     await this.anim.wait(320);
   }
 
-  /** Highlights winning cells: winners pulse above the frame, the rest dim. */
-  highlight(cells: Array<[number, number]>, tint: number, celebrate: boolean): void {
-    this.clearHighlight();
-    for (const reel of this.reels) reel.dim = 0.38;
+  private addClones(cells: Array<[number, number]>, tint: number, celebrate: boolean, entrance: boolean): void {
     for (const [r, row] of cells) {
       const reel = this.reels[r];
       reel.hidden[row] = true;
       const { x, y } = this.cellCenter(r, row);
+      const sym = reel.symbolAtRow(row);
+      let rays: Sprite | null = null;
+      if (celebrate && entrance && isPremium(sym)) {
+        rays = new Sprite(this.tex.rays);
+        rays.anchor.set(0.5);
+        rays.position.set(x, y);
+        rays.tint = SYMBOL_TINT[sym];
+        rays.blendMode = 'add';
+        rays.alpha = 0;
+        rays.scale.set((CELL * 1.5) / 512);
+        this.overlay.addChild(rays);
+      }
       const glow = new Sprite(this.tex.cellGlow);
       glow.anchor.set(0.5);
       glow.position.set(x, y);
       glow.tint = tint;
       glow.blendMode = 'add';
       glow.scale.set(CELL / 190);
-      const sym = reel.symbolAtRow(row);
       const sprite = new Sprite(this.tex.symbols[sym]);
       sprite.anchor.set(0.5);
       sprite.position.set(x, y);
       sprite.scale.set(SYMBOL_SCALE * (256 / sprite.texture.width));
       this.overlay.addChild(glow, sprite);
-      this.winClones.push({ sprite, glow, reel: r, row });
+      const clone: WinClone = { sprite, glow, rays, reel: r, row, pop: 1 };
+      this.winClones.push(clone);
+      if (entrance && celebrate) {
+        // Winners punch in one reel after another, left to right.
+        clone.pop = 0.72;
+        glow.alpha = 0;
+        void this.anim
+          .run(r * 60, () => undefined, true)
+          .then(() => {
+            if (sprite.destroyed) return;
+            this.flash(x, y, tint, 1.1);
+            return this.anim.run(300, (t) => (clone.pop = 0.72 + 0.28 * ease.outBack(t)), true);
+          });
+      }
     }
-    for (const reel of this.reels) reel.layout();
-    const base = SYMBOL_SCALE;
-    const amp = celebrate ? 0.09 : 0.04;
-    this.stopPulse = this.anim.loop(700, (t) => {
-      const k = Math.sin(t * Math.PI);
+  }
+
+  private startPulse(periodMs: number, amp: number, sparkle: boolean): void {
+    let frame = 0;
+    let turn = 0;
+    this.stopPulse = this.anim.loop(periodMs, (t) => {
+      if (t >= 1) turn++;
+      frame++;
       for (const c of this.winClones) {
-        c.sprite.scale.set(base * (256 / c.sprite.texture.width) * (1 + amp * k));
-        c.glow.alpha = 0.55 + 0.45 * k;
+        // A wave that travels across the reels rather than one flat pulse.
+        const phase = (t + 1 - c.reel * 0.11) % 1;
+        const k = Math.sin(phase * Math.PI);
+        c.sprite.scale.set(SYMBOL_SCALE * (256 / c.sprite.texture.width) * c.pop * (1 + amp * k));
+        c.sprite.rotation = sparkle ? Math.sin((t + turn) * Math.PI * 2 + c.reel) * 0.035 : 0;
+        c.glow.alpha = (0.5 + 0.5 * k) * Math.max(0, Math.min(1, (c.pop - 0.72) / 0.28));
+        if (c.rays) {
+          c.rays.rotation += 0.012;
+          c.rays.alpha = 0.35 + 0.25 * k;
+        }
+      }
+      if (sparkle && frame % 5 === 0 && this.winClones.length) {
+        const c = this.winClones[(Math.random() * this.winClones.length) | 0];
+        this.particles.burst(c.sprite.x, c.sprite.y, {
+          texture: this.tex.spark,
+          count: 1,
+          tints: [0xffd977, 0xffffff],
+          speed: [40, 160],
+          life: [350, 700],
+          scale: [0.15, 0.45],
+          additive: true,
+          radius: CELL * 0.35,
+        });
       }
     });
+  }
+
+  /**
+   * Highlights winning cells: winners rise above the frame and pulse, the
+   * rest dim. `celebrate` is false for returns at or below the stake, which
+   * are shown without flourish.
+   */
+  highlight(cells: Array<[number, number]>, tint: number, celebrate: boolean, entrance = true): void {
+    this.clearHighlight();
+    for (const reel of this.reels) reel.dim = 0.38;
+    this.addClones(cells, tint, celebrate, entrance);
+    for (const reel of this.reels) reel.layout();
+    this.startPulse(760, celebrate ? 0.1 : 0.04, celebrate);
   }
 
   clearHighlight(): void {
@@ -401,6 +539,7 @@ export class ReelSet {
     for (const c of this.winClones) {
       c.sprite.destroy();
       c.glow.destroy();
+      c.rays?.destroy();
     }
     this.winClones = [];
     for (const reel of this.reels) {

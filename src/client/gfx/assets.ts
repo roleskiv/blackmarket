@@ -23,6 +23,7 @@ export interface GameTextures {
   cellGlow: Texture;
   door: Texture;
   smoke: Texture;
+  ring: Texture;
 }
 
 const base = import.meta.env.BASE_URL;
@@ -221,6 +222,19 @@ function smokeTexture(): Texture {
   return Texture.from(c);
 }
 
+/** Soft ring used for shockwaves. */
+function ringTexture(): Texture {
+  const [c, g] = canvas(256, 256);
+  g.shadowColor = '#fff';
+  g.shadowBlur = 14;
+  g.strokeStyle = '#fff';
+  g.lineWidth = 9;
+  g.beginPath();
+  g.arc(128, 128, 100, 0, Math.PI * 2);
+  g.stroke();
+  return Texture.from(c);
+}
+
 function blurredCopy(tex: Texture): Texture {
   const src = tex.source.resource as CanvasImageSource;
   const [c, g] = canvas(128, 176);
@@ -288,5 +302,6 @@ export async function loadTextures(onProgress: (fraction: number) => void): Prom
     cellGlow: cellGlowTexture(),
     door: doorTexture(),
     smoke: smokeTexture(),
+    ring: ringTexture(),
   };
 }

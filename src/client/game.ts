@@ -355,6 +355,7 @@ export class Game {
       anticipation: 0,
       onReelStop: () => undefined,
       onAnticipation: () => undefined,
+      onAnticipationResult: () => undefined,
     });
     scene.anim.fast = false;
     this.sound.reelsQuiet();
@@ -461,7 +462,9 @@ export class Game {
     const scatterCells = scene.reels.findSymbol(SCATTER);
     scene.reels.highlight(scatterCells, SYMBOL_TINT[SCATTER], true);
     sound.featureTrigger();
-    scene.shake(10);
+    scene.shake(14);
+    scene.screenFlash(0.45, 420, 0xff5c8a);
+    for (const [r, row] of scatterCells) scene.cellRing(r, row, SYMBOL_TINT[SCATTER], 5);
     hud.setMessage(t('feature.spins', { n: base.spinsAwarded }));
     await scene.anim.wait(1500);
     scene.reels.clearHighlight();
@@ -490,20 +493,26 @@ export class Game {
       scene.anim.fast = false;
       left--;
       scene.setMeter(left, multiplier, this.money(vaultWin));
-      hud.setMessage(t('msg.freeSpin', { n: step.index }));
+      hud.setMessage(left === 0 ? t('msg.lastSpin') : t('msg.freeSpin', { n: step.index }));
       this.startReels();
       this.updateSpinButton();
-      await scene.anim.wait(this.settings.turbo ? 100 : 380);
+      await scene.anim.wait(this.settings.turbo ? 100 : 260);
       await this.landReels(step);
 
       if (step.wildsLanded > 0) {
         const cells: Array<[number, number]> = [];
         step.grid.forEach((col, r) => col.forEach((s, row) => s === WILD && cells.push([r, row])));
         const to = step.multiplier;
+        const before = multiplier;
         await scene.bumpMultiplier(cells, () => {
           multiplier = to;
           scene.setMeter(left, multiplier, this.money(vaultWin));
           sound.multiplierUp(to);
+          // Every fifth step of the multiplier is a moment of its own.
+          if (Math.floor(to / 5) > Math.floor(before / 5)) {
+            scene.medalBurst(`×${to}`);
+            sound.anticipationHit(Math.min(5, to / 5));
+          }
         });
       }
       if (step.spinsAwarded > 0) {
@@ -552,21 +561,39 @@ export class Game {
   }
 
   private async landReels(step: SpinStep): Promise<void> {
-    const { scene, sound } = this;
+    const { scene, sound, hud } = this;
     const turbo = this.settings.turbo;
     const anticipation = step.kind === 'base' ? (turbo ? 500 : 1300) : 0;
     let scatters = 0;
+    let teased = false;
     await scene.reels.stop({
       stops: step.stops,
-      stagger: turbo ? 70 : 250,
+      stagger: turbo ? 70 : step.kind === 'free' ? 180 : 250,
       anticipation,
       onReelStop: (r, landed) => {
         sound.reelStop(r);
         if (landed.includes(SCATTER)) sound.scatterLand(++scatters);
         if (step.kind === 'free' && landed.includes(WILD)) sound.wildLand();
       },
-      onAnticipation: () => sound.anticipation(anticipation),
+      onAnticipation: (_r, nth, ms) => {
+        teased = true;
+        sound.anticipation(ms, nth);
+        scene.setTension(nth);
+        hud.setMessage(t(scatters >= 3 ? 'msg.teaseMore' : 'msg.tease'));
+      },
+      onAnticipationResult: (r, hit, count) => {
+        if (!hit) return;
+        sound.anticipationHit(count);
+        scene.shake(6 + count * 2);
+        step.grid[r].forEach((s, row) => s === SCATTER && scene.cellRing(r, row, SYMBOL_TINT[SCATTER], 3 + count));
+        scene.screenFlash(0.12 + count * 0.04, 260, 0xff5c8a);
+      },
     });
+    scene.setTension(0);
+    if (teased && scatters < 3) {
+      sound.anticipationMiss();
+      hud.setMessage(t('msg.goodLuck'));
+    }
     sound.reelsQuiet();
     this.reelsMoving = false;
     // A slam stop ends here; it does not also skip the win presentation.
@@ -627,6 +654,21 @@ export class Game {
       if (celebrate) sound.win(x < 3 ? 0 : x < 8 ? 1 : x < 20 ? 2 : 3);
       else sound.smallReturn();
       const emphasis = celebrate ? Math.min(1, 0.55 + x * 0.04) : 0.45;
+      if (celebrate) {
+        // Winnings visibly travel from the reels to the win readout.
+        const canvas = scene.app.canvas.getBoundingClientRect();
+        const target = hud.winPoint();
+        void scene.flyToScreen([...all.values()], target.x - canvas.left, target.y - canvas.top, 0xffd977).then(() => {
+          hud.bumpWin();
+          sound.collect();
+        });
+        if (x >= 5) {
+          scene.shake(4 + Math.min(8, x * 0.4));
+          scene.screenFlash(0.1 + Math.min(0.15, x * 0.008), 240, 0xffd977);
+          const mid = step.wins.reduce((a, b) => (b.coins > a.coins ? b : a), step.wins[0]);
+          if (mid) scene.cellRing(Math.min(mid.reels - 1, 2), 1.5, SYMBOL_TINT[mid.symbol], 6);
+        }
+      }
       const waysTotal = step.wins.reduce((a, w) => a + w.coins, 0) * coin;
       if (step.multiplier > 1 && waysTotal > 0) {
         // Show the multiplier doing its work.
@@ -668,36 +710,58 @@ export class Game {
     });
   }
 
+  /**
+   * Big-win celebration. The count climbs through the tiers in order: each
+   * tier has its own stretch of the count, and crossing into the next one is
+   * a beat of its own (title slam, shockwave, heavier coin rain). One tap
+   * skips to the final amount.
+   */
   private async bigWin(amount: number, bet: number): Promise<void> {
     const { scene, sound } = this;
     const x = amount / bet;
     const finalTier = (x >= TIERS[2] ? 3 : x >= TIERS[1] ? 2 : 1) as WinTier;
     scene.anim.fast = false;
     sound.duck(true);
-    let tier: WinTier = 1;
+
+    // Impact: a held beat before the celebration opens.
+    sound.impact();
+    scene.screenFlash(0.8, 300);
+    scene.shake(18);
+    await scene.anim.wait(160);
+
+    const ceiling = [0, TIERS[1] * bet, TIERS[2] * bet, Infinity];
+    const stretch = [0, 2600, 2900, 3600];
     scene.showBigWin(1, this.money(0));
     sound.bigWin(1);
-    const ms = [0, 3200, 5200, 7500][finalTier];
-    let coinsAt = 0;
-    await scene.anim.run(ms, (k) => {
-      const v = amount * ease.inOutQuad(k);
-      const vx = v / bet;
-      const now = (vx >= TIERS[2] ? 3 : vx >= TIERS[1] ? 2 : 1) as WinTier;
-      if (now > tier && k < 1) {
-        tier = now;
+    let from = 0;
+    for (let tier = 1; tier <= finalTier; tier++) {
+      const skipping = scene.anim.fast;
+      if (tier > 1 && !skipping) {
+        scene.setBigWin(tier as WinTier, this.money(from));
+        sound.impact();
         sound.bigWin(tier);
+        await scene.anim.wait(620);
       }
-      scene.setBigWin(k >= 1 ? finalTier : tier, this.money(k >= 1 ? amount : Math.floor(v / 10) * 10));
-      if (k < 1) sound.tick(k);
-      if (k - coinsAt > 0.12 && k < 1) {
-        coinsAt = k;
-        scene.coinBurst(10 + tier * 6);
-      }
-    });
-    if (finalTier > tier) sound.bigWin(finalTier);
-    sound.coins(16);
+      const to = Math.min(amount, ceiling[tier]);
+      const last = tier === finalTier;
+      const start = from;
+      let ticks = 0;
+      await scene.anim.run(stretch[tier], (k) => {
+        if (k >= 1) return;
+        // The last stretch slows into the final amount; earlier ones run flat out.
+        const v = start + (to - start) * (last ? ease.outQuad(k) : k);
+        scene.setBigWin(tier as WinTier, this.money(Math.floor(v / 10) * 10));
+        sound.tick(k);
+        if (++ticks % 6 === 0) scene.bumpAmount();
+      });
+      from = to;
+    }
+
+    scene.setBigWin(finalTier, this.money(amount));
+    scene.bigWinFinale();
+    sound.bigWinEnd(finalTier);
     scene.anim.fast = false;
-    await scene.anim.wait(1800);
+    await scene.anim.wait(2200);
     scene.anim.fast = false;
     await scene.hideBigWin();
     sound.duck(false);

@@ -280,12 +280,60 @@ export class Sound {
     this.bell(midi(81), 0.05, 0.1, 0.8);
   }
 
-  /** Rising tension while a reel that can complete the trigger is still spinning. */
-  anticipation(ms: number): void {
+  /**
+   * Rising tension while a reel that can still add to the trigger is
+   * spinning. Each further teased reel (`nth`) starts higher and beats faster.
+   */
+  anticipation(ms: number, nth = 1): void {
     const dur = ms / 1000 + 0.3;
-    this.tone({ freq: 110, slideTo: 440, dur, gain: 0.09, type: 'sawtooth', filter: 1400, attack: 0.2 });
-    this.tone({ freq: 164.8, slideTo: 659, dur, gain: 0.06, type: 'sawtooth', filter: 1400, attack: 0.2 });
+    const up = 2 ** ((nth - 1) / 4);
+    this.tone({ freq: 110 * up, slideTo: 440 * up, dur, gain: 0.09, type: 'sawtooth', filter: 1400, attack: 0.2 });
+    this.tone({ freq: 164.8 * up, slideTo: 659 * up, dur, gain: 0.06, type: 'sawtooth', filter: 1400, attack: 0.2 });
     this.noise({ freq: 400, sweepTo: 3200, dur, gain: 0.06, q: 2, attack: dur * 0.8 });
+    // Heartbeat underneath, quickening as the reel runs on.
+    const gap = Math.max(0.2, 0.4 - nth * 0.05);
+    for (let at = 0, i = 0; at < dur - 0.25; at += gap * (1 - i * 0.04), i++) {
+      this.tone({ freq: 62, slideTo: 40, at, dur: 0.14, gain: 0.3 });
+      this.tone({ freq: 55, slideTo: 38, at: at + 0.11, dur: 0.12, gain: 0.18 });
+    }
+  }
+
+  /** The teased reel delivered a Scatter. */
+  anticipationHit(nth: number): void {
+    this.noise({ freq: 5000, type: 'highpass', dur: 0.5, gain: 0.12, reverb: 0.5 });
+    this.tone({ freq: midi(50), slideTo: midi(38), dur: 0.5, gain: 0.35 });
+    [0, 4, 7, 12].forEach((n, i) => this.bell(midi(74 + nth * 2 + n), i * 0.05, 0.12, 1.2));
+  }
+
+  /** The teased reel came up empty: let the tension out gently. */
+  anticipationMiss(): void {
+    this.tone({ freq: 330, slideTo: 150, dur: 0.45, gain: 0.07, type: 'triangle', filter: 900, reverb: 0.3 });
+    this.noise({ freq: 1800, sweepTo: 300, dur: 0.4, gain: 0.04, q: 1 });
+  }
+
+  /** Heavy hit that opens a big-win celebration. */
+  impact(): void {
+    this.tone({ freq: 90, slideTo: 32, dur: 0.7, gain: 0.5 });
+    this.noise({ freq: 220, type: 'lowpass', dur: 0.5, gain: 0.35 });
+    this.noise({ freq: 7000, type: 'highpass', dur: 0.9, gain: 0.1, reverb: 0.6 });
+  }
+
+  /** Final chord when the big-win count lands. */
+  bigWinEnd(tier: number): void {
+    const root = CHORDS[0];
+    for (const n of root) {
+      this.tone({ freq: midi(n + 12), type: 'sawtooth', dur: 1.6, gain: 0.07, filter: 2600, attack: 0.02, reverb: 0.5 });
+      this.bell(midi(n + 24), 0.04, 0.09, 1.8);
+    }
+    this.tone({ freq: midi(root[0] - 12), dur: 1.4, gain: 0.3 });
+    this.noise({ freq: 6500, type: 'highpass', dur: 1.8, gain: 0.1, reverb: 0.6 });
+    this.coins(14 + tier * 6);
+  }
+
+  /** Winnings arriving at the win readout. */
+  collect(): void {
+    this.tone({ freq: 1568, dur: 0.09, gain: 0.07, type: 'triangle' });
+    this.tone({ freq: 2093, at: 0.05, dur: 0.14, gain: 0.07, type: 'triangle', reverb: 0.2 });
   }
 
   crateOpen(): void {
