@@ -1,0 +1,183 @@
+<!-- out: public/assets/bg/market.jpg size: 2048x2048 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="2048" height="2048" viewBox="0 0 2048 2048">
+  <defs>
+    <radialGradient id="sky" cx=".5" cy=".42" r=".75">
+      <stop offset="0" stop-color="#4a2c73"/><stop offset=".35" stop-color="#2a1746"/><stop offset=".7" stop-color="#150b25"/><stop offset="1" stop-color="#07040d"/>
+    </radialGradient>
+    <radialGradient id="portal" cx=".5" cy=".55" r=".6">
+      <stop offset="0" stop-color="#c9a6ff"/><stop offset=".3" stop-color="#7c4bd6"/><stop offset=".7" stop-color="#3a1f6e"/><stop offset="1" stop-color="#1a0f33"/>
+    </radialGradient>
+    <radialGradient id="lamp" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#ffe9a8" stop-opacity=".95"/><stop offset=".25" stop-color="#ffb347" stop-opacity=".55"/><stop offset="1" stop-color="#ff8a1e" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="lampV" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#f2d0ff" stop-opacity=".95"/><stop offset=".25" stop-color="#b85cff" stop-opacity=".5"/><stop offset="1" stop-color="#7a2bd0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="lampG" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#d9ffc9" stop-opacity=".9"/><stop offset=".3" stop-color="#6fe05a" stop-opacity=".4"/><stop offset="1" stop-color="#2f9e3a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a1a40"/><stop offset="1" stop-color="#08050e"/></linearGradient>
+    <linearGradient id="awnA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6b1f3a"/><stop offset="1" stop-color="#3a0f24"/></linearGradient>
+    <linearGradient id="awnB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b1a3f"/><stop offset="1" stop-color="#1a0f28"/></linearGradient>
+    <linearGradient id="woodD" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2c1b22"/><stop offset=".5" stop-color="#3d2630"/><stop offset="1" stop-color="#21131a"/></linearGradient>
+    <linearGradient id="fogTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#07040d" stop-opacity=".9"/><stop offset="1" stop-color="#07040d" stop-opacity="0"/></linearGradient>
+    <linearGradient id="fogBot" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6b4aa8" stop-opacity="0"/><stop offset=".6" stop-color="#4a2f7c" stop-opacity=".35"/><stop offset="1" stop-color="#0a0612" stop-opacity=".9"/></linearGradient>
+    <radialGradient id="vig" cx=".5" cy=".5" r=".72"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".78"/></radialGradient>
+    <pattern id="bricks" width="120" height="80" patternUnits="userSpaceOnUse">
+      <rect width="120" height="80" fill="#1c1230"/>
+      <rect x="3" y="3" width="114" height="34" rx="4" fill="#2a1b45"/>
+      <rect x="-57" y="43" width="114" height="34" rx="4" fill="#261840"/>
+      <rect x="63" y="43" width="114" height="34" rx="4" fill="#2d1d4a"/>
+    </pattern>
+    <pattern id="cobble" width="150" height="70" patternUnits="userSpaceOnUse">
+      <rect width="150" height="70" fill="#120b1f"/>
+      <ellipse cx="38" cy="18" rx="34" ry="14" fill="#2b1c44"/><ellipse cx="112" cy="18" rx="34" ry="14" fill="#241739"/>
+      <ellipse cx="0" cy="52" rx="34" ry="14" fill="#271a3f"/><ellipse cx="75" cy="52" rx="34" ry="14" fill="#2f1f4b"/><ellipse cx="150" cy="52" rx="34" ry="14" fill="#271a3f"/>
+    </pattern>
+    <filter id="paint" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="4" seed="21" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="26"/>
+    </filter>
+    <filter id="mottle" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.006 0.009" numOctaves="5" seed="8" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.03  0 0 0 0 0.01  0 0 0 0 0.06  0 0 0 -2.2 1.25"/>
+    </filter>
+    <filter id="b6"><feGaussianBlur stdDeviation="6"/></filter>
+    <filter id="b14"><feGaussianBlur stdDeviation="14"/></filter>
+    <filter id="b40" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="40"/></filter>
+    <g id="bottleA"><path d="M-12 0 V-44 C-12 -56 -5 -58 -5 -70 V-88 H5 V-70 C5 -58 12 -56 12 -44 V0 Z"/></g>
+    <g id="bottleB"><path d="M-18 0 V-30 C-18 -48 -6 -50 -6 -62 V-74 H6 V-62 C6 -50 18 -48 18 -30 V0 Z"/></g>
+    <g id="jar"><path d="M-20 0 V-46 C-20 -54 -14 -56 -14 -60 H14 C14 -56 20 -54 20 -46 V0 Z"/><rect x="-16" y="-68" width="32" height="9" rx="2"/></g>
+    <g id="lantern">
+      <path d="M0 -150 V-62" stroke="#0c0714" stroke-width="5"/>
+      <path d="M-26 -62 H26 L34 -50 H-34 Z" fill="#150c1f"/>
+      <path d="M-30 -50 H30 L24 30 H-24 Z" fill="#ffcf73"/>
+      <path d="M-30 -50 H30 L24 30 H-24 Z" fill="none" stroke="#150c1f" stroke-width="7"/>
+      <path d="M0 -50 V30 M-27 -10 H27" stroke="#150c1f" stroke-width="5"/>
+      <path d="M-28 30 H28 L20 44 H-20 Z" fill="#150c1f"/>
+    </g>
+    <g id="crateS">
+      <rect x="0" y="0" width="200" height="150" fill="#2a1a26" stroke="#0c0714" stroke-width="8"/>
+      <path d="M0 50 H200 M0 100 H200" stroke="#0c0714" stroke-width="6"/>
+      <path d="M0 0 L200 150 M200 0 L0 150" stroke="#1b1019" stroke-width="16" opacity=".85"/>
+      <rect x="0" y="0" width="22" height="150" fill="#1b1019"/><rect x="178" y="0" width="22" height="150" fill="#1b1019"/>
+      <path d="M6 8 H194" stroke="#56364a" stroke-width="3" opacity=".7"/>
+    </g>
+  </defs>
+
+  <rect width="2048" height="2048" fill="url(#sky)"/>
+  <!-- back wall -->
+  <g opacity=".55" filter="url(#paint)"><rect x="-40" y="120" width="2128" height="1500" fill="url(#bricks)"/></g>
+  <rect width="2048" height="2048" filter="url(#mottle)" opacity=".8"/>
+
+  <!-- great arch and the glowing passage beyond -->
+  <g filter="url(#paint)">
+    <path d="M560 1560 V760 C560 420 1488 420 1488 760 V1560 Z" fill="#0d0718"/>
+    <path d="M610 1560 V770 C610 480 1438 480 1438 770 V1560 Z" fill="url(#portal)"/>
+    <!-- distant stalls/rooftops inside arch -->
+    <path d="M610 1250 L700 1160 L770 1210 L860 1090 L950 1180 L1024 1060 L1110 1190 L1190 1110 L1290 1220 L1360 1150 L1438 1240 V1560 H610 Z" fill="#24133f" opacity=".85"/>
+    <path d="M610 1360 L720 1290 L800 1330 L900 1250 L1000 1320 L1100 1270 L1200 1340 L1320 1280 L1438 1350 V1560 H610 Z" fill="#170c2a"/>
+    <!-- arch stones -->
+    <path d="M560 1560 V760 C560 420 1488 420 1488 760 V1560" fill="none" stroke="#3b2760" stroke-width="54"/>
+    <path d="M560 1560 V760 C560 420 1488 420 1488 760 V1560" fill="none" stroke="#120a20" stroke-width="54" stroke-dasharray="6 96"/>
+    <path d="M532 1560 V760 C532 384 1516 384 1516 760 V1560" fill="none" stroke="#0b0614" stroke-width="10"/>
+    <path d="M586 1560 V765 C586 452 1462 452 1462 765 V1560" fill="none" stroke="#6a48a4" stroke-width="5" opacity=".7"/>
+    <path d="M984 430 L1024 380 L1064 430 L1052 500 H996 Z" fill="#4a3177" stroke="#0b0614" stroke-width="8"/>
+  </g>
+  <ellipse cx="1024" cy="980" rx="420" ry="520" fill="#a070ff" opacity=".22" filter="url(#b40)"/>
+
+  <!-- string lights across the top -->
+  <path d="M-20 300 C400 470 700 380 1024 330 C1350 380 1650 470 2068 300" fill="none" stroke="#0a0612" stroke-width="5"/>
+  <g>
+    <circle cx="180" cy="366" r="46" fill="url(#lamp)"/><circle cx="180" cy="366" r="9" fill="#fff0c0"/>
+    <circle cx="420" cy="408" r="46" fill="url(#lampV)"/><circle cx="420" cy="408" r="9" fill="#f5dcff"/>
+    <circle cx="660" cy="388" r="46" fill="url(#lamp)"/><circle cx="660" cy="388" r="9" fill="#fff0c0"/>
+    <circle cx="880" cy="350" r="46" fill="url(#lampG)"/><circle cx="880" cy="350" r="9" fill="#e6ffd9"/>
+    <circle cx="1168" cy="350" r="46" fill="url(#lamp)"/><circle cx="1168" cy="350" r="9" fill="#fff0c0"/>
+    <circle cx="1388" cy="388" r="46" fill="url(#lampV)"/><circle cx="1388" cy="388" r="9" fill="#f5dcff"/>
+    <circle cx="1628" cy="408" r="46" fill="url(#lamp)"/><circle cx="1628" cy="408" r="9" fill="#fff0c0"/>
+    <circle cx="1868" cy="366" r="46" fill="url(#lampG)"/><circle cx="1868" cy="366" r="9" fill="#e6ffd9"/>
+  </g>
+
+  <!-- LEFT STALL -->
+  <g filter="url(#paint)">
+    <rect x="40" y="640" width="34" height="980" fill="url(#woodD)"/><rect x="470" y="700" width="30" height="920" fill="url(#woodD)"/>
+    <!-- shelves backing -->
+    <rect x="74" y="800" width="396" height="560" fill="#120a1c"/>
+    <rect x="74" y="930" width="396" height="18" fill="#3a2430"/><rect x="74" y="1090" width="396" height="18" fill="#3a2430"/><rect x="74" y="1250" width="396" height="18" fill="#3a2430"/>
+    <!-- bottles -->
+    <g fill="#3fae4a"><use href="#bottleA" x="120" y="930"/><use href="#jar" x="330" y="1090"/></g>
+    <g fill="#9a4be0"><use href="#bottleB" x="190" y="930"/><use href="#bottleA" x="400" y="930"/><use href="#bottleB" x="150" y="1250"/></g>
+    <g fill="#d28a2c"><use href="#jar" x="270" y="930"/><use href="#bottleA" x="230" y="1090"/><use href="#bottleA" x="400" y="1250"/></g>
+    <g fill="#b33a5a"><use href="#bottleB" x="140" y="1090"/><use href="#bottleB" x="420" y="1090"/><use href="#jar" x="280" y="1250"/></g>
+    <g fill="#fff" opacity=".25"><rect x="113" y="892" width="4" height="30"/><rect x="180" y="884" width="5" height="34"/><rect x="258" y="884" width="5" height="34"/><rect x="223" y="1052" width="4" height="30"/><rect x="268" y="1206" width="5" height="34"/></g>
+    <!-- counter with cloth -->
+    <path d="M30 1360 H520 V1420 H30 Z" fill="#4a2a36"/>
+    <path d="M40 1420 H510 L500 1640 C440 1600 400 1650 330 1620 C260 1590 220 1650 150 1620 C110 1604 80 1630 50 1640 Z" fill="#3a1030"/>
+    <path d="M40 1420 H510" stroke="#c9a24a" stroke-width="6" opacity=".7"/>
+    <!-- awning -->
+    <path d="M0 610 L540 690 L560 820 C520 850 490 800 450 830 C410 860 380 800 340 826 C300 852 270 790 230 815 C190 840 160 780 120 800 C80 820 50 770 0 790 Z" fill="url(#awnA)"/>
+    <path d="M90 624 L180 637 L190 800 C170 786 150 800 120 800 L96 790 Z M270 650 L360 664 L372 812 C350 804 345 822 340 826 C320 838 300 800 282 796 Z M450 676 L540 690 L560 820 C530 842 500 806 462 824 Z" fill="url(#awnB)"/>
+    <path d="M0 610 L540 690" stroke="#c9a24a" stroke-width="7" opacity=".8"/>
+  </g>
+  <use href="#lantern" x="300" y="840" transform="scale(1)"/>
+  <circle cx="300" cy="830" r="170" fill="url(#lamp)" opacity=".8"/>
+  <circle cx="190" cy="1040" r="90" fill="url(#lampV)" opacity=".5"/><circle cx="330" cy="1060" r="80" fill="url(#lampG)" opacity=".45"/><circle cx="270" cy="900" r="70" fill="url(#lamp)" opacity=".35"/>
+
+  <!-- RIGHT STALL -->
+  <g filter="url(#paint)">
+    <rect x="1974" y="640" width="34" height="980" fill="url(#woodD)"/><rect x="1548" y="700" width="30" height="920" fill="url(#woodD)"/>
+    <rect x="1578" y="800" width="396" height="560" fill="#120a1c"/>
+    <!-- hanging curtain -->
+    <path d="M1578 800 H1974 V1010 C1930 1040 1900 1000 1860 1030 C1820 1060 1790 1010 1750 1036 C1710 1062 1680 1010 1640 1030 C1610 1046 1596 1020 1578 1030 Z" fill="#2b1a3f"/>
+    <path d="M1640 800 V1030 M1750 800 V1036 M1860 800 V1030" stroke="#1a0f28" stroke-width="10"/>
+    <!-- bird cage -->
+    <path d="M1700 1050 V1090" stroke="#0c0714" stroke-width="5"/>
+    <path d="M1640 1150 C1640 1070 1760 1070 1760 1150 V1250 H1640 Z" fill="#170d22" stroke="#c9a24a" stroke-width="5"/>
+    <path d="M1670 1100 V1250 M1700 1090 V1250 M1730 1100 V1250" stroke="#c9a24a" stroke-width="3" opacity=".8"/>
+    <path d="M1676 1232 C1672 1196 1690 1176 1708 1178 C1722 1180 1728 1192 1740 1194 L1724 1202 C1728 1220 1722 1236 1712 1240 Z" fill="#07040d"/>
+    <circle cx="1712" cy="1190" r="3.5" fill="#ff4a6a"/>
+    <!-- skulls and goods -->
+    <rect x="1578" y="1250" width="396" height="18" fill="#3a2430"/>
+    <g fill="#cdbf9c"><path d="M1830 1250 C1800 1250 1796 1196 1836 1190 C1878 1190 1880 1250 1850 1250 Z"/><path d="M1900 1250 C1880 1250 1876 1210 1906 1206 C1936 1206 1938 1250 1916 1250 Z"/></g>
+    <g fill="#120a1c"><circle cx="1824" cy="1222" r="8"/><circle cx="1850" cy="1222" r="8"/><circle cx="1898" cy="1230" r="6"/><circle cx="1916" cy="1230" r="6"/></g>
+    <path d="M1528 1360 H2018 V1420 H1528 Z" fill="#4a2a36"/>
+    <path d="M1538 1420 H2008 L1998 1640 C1940 1600 1900 1650 1830 1620 C1760 1590 1720 1650 1650 1620 C1610 1604 1580 1630 1548 1640 Z" fill="#1f1640"/>
+    <path d="M1538 1420 H2008" stroke="#c9a24a" stroke-width="6" opacity=".7"/>
+    <path d="M2048 610 L1508 690 L1488 820 C1528 850 1558 800 1598 830 C1638 860 1668 800 1708 826 C1748 852 1778 790 1818 815 C1858 840 1888 780 1928 800 C1968 820 1998 770 2048 790 Z" fill="url(#awnB)"/>
+    <path d="M1958 624 L1868 637 L1858 800 C1878 786 1898 800 1928 800 L1952 790 Z M1778 650 L1688 664 L1676 812 C1698 804 1703 822 1708 826 C1728 838 1748 800 1766 796 Z M1598 676 L1508 690 L1488 820 C1518 842 1548 806 1586 824 Z" fill="#3a1f5c"/>
+    <path d="M2048 610 L1508 690" stroke="#c9a24a" stroke-width="7" opacity=".8"/>
+  </g>
+  <use href="#lantern" x="1880" y="1120"/>
+  <circle cx="1880" cy="1110" r="170" fill="url(#lampV)" opacity=".8"/>
+  <circle cx="1700" cy="1180" r="100" fill="url(#lamp)" opacity=".3"/>
+
+  <!-- floor -->
+  <path d="M0 1560 H2048 V2048 H0 Z" fill="url(#floor)"/>
+  <g opacity=".7" filter="url(#paint)"><path d="M0 1580 H2048 V2048 H0 Z" fill="url(#cobble)"/></g>
+  <ellipse cx="1024" cy="1640" rx="520" ry="90" fill="#9a6bff" opacity=".28" filter="url(#b40)"/>
+  <ellipse cx="300" cy="1700" rx="260" ry="50" fill="#ffb347" opacity=".14" filter="url(#b40)"/>
+  <ellipse cx="1840" cy="1700" rx="260" ry="50" fill="#b85cff" opacity=".16" filter="url(#b40)"/>
+
+  <!-- foreground crates -->
+  <g filter="url(#paint)">
+    <use href="#crateS" x="-40" y="1700"/><use href="#crateS" x="170" y="1760"/><use href="#crateS" x="20" y="1860"/><use href="#crateS" x="240" y="1910"/>
+    <use href="#crateS" x="1880" y="1700"/><use href="#crateS" x="1680" y="1760"/><use href="#crateS" x="1830" y="1860"/><use href="#crateS" x="1610" y="1910"/>
+    <use href="#crateS" x="700" y="1930" transform="scale(1)"/><use href="#crateS" x="1150" y="1950"/>
+  </g>
+
+  <!-- top beams / rooftops -->
+  <g filter="url(#paint)">
+    <path d="M0 0 H2048 V150 C1700 230 1500 120 1024 170 C560 120 340 230 0 150 Z" fill="#0a0612"/>
+    <path d="M0 170 L260 40 L520 190 Z" fill="#120a1e"/><path d="M2048 170 L1788 40 L1528 190 Z" fill="#120a1e"/>
+    <rect x="820" y="90" width="408" height="24" fill="#150c1f"/>
+    <path d="M880 114 V190 M1168 114 V190" stroke="#0c0714" stroke-width="6"/>
+  </g>
+  <!-- moon -->
+  <circle cx="1024" cy="250" r="150" fill="#c9b6ff" opacity=".12" filter="url(#b40)"/>
+
+  <!-- atmosphere -->
+  <rect width="2048" height="700" fill="url(#fogTop)"/>
+  <rect y="1300" width="2048" height="748" fill="url(#fogBot)"/>
+  <rect width="2048" height="2048" fill="url(#vig)"/>
+</svg>
