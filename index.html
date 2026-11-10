@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0b0612" />
+    <title>BLACK MARKET</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #07040d; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="stage"></div>
+      <div id="dialogs"></div>
+      <div id="loading" class="loading">
+        <div class="loading__inner">
+          <div class="loading__logo"><span>BLACK</span><span>MARKET</span></div>
+          <div class="loading__bar" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="loading-fill"></i></div>
+          <button id="enter" class="btn btn--pill btn--primary loading__enter" hidden>Enter the market</button>
+          <p id="loading-note" class="loading__note"></p>
+        </div>
+      </div>
+    </div>
+    <noscript>BLACK MARKET needs JavaScript to run.</noscript>
+    <script type="module" src="/src/client/main.ts"></script>
+  </body>
+</html>
