@@ -76,6 +76,7 @@ export class Game {
     this.refreshHud();
     hud.setWin(this.money(0));
     hud.setMessage(t('msg.idle'));
+    hud.setSpinMode('spin');
     scene.reels.setStrips(this.game.strips.base, this.restingStops());
 
     window.setInterval(() => this.tickClock(), 1000);

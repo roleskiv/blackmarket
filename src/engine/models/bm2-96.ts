@@ -15,23 +15,23 @@ const BM2_96: MathModel = {
   ...SHARED_RULES,
   base: {
     strips: [
-      'CMK?sHHSPsG?cccGPPhB?BDBBDsccHHGhMhhKPssHGH?DBSMBCsPGKKBKBBGDcdcdDhddcCG?ChKHPs?DPhKsKdDdhddHDCMMM',
-      'BsBssGPddHDCBHhPShMCBGDSKKGKKKssGscWscW?WcdMPD?M?GhdcBHdKKKccCcPPhPhDDcccMMhhhMdc???P?B?BDsdds',
-      'GGcPMChhCKDCHMBHBdhBB??d?K?PMdCDDsSDsHsMssHsssPccMdGcGhhdDMKKcKDGhKHKWhWcW??GMHBHPDPPcShPdddBBK?cc',
-      'GPGPKHBHMcCPhMBdsd?GSsPWChsW?cBsHHddMMBWKdSsGKDMDDBKGsGhChhGcMKDscBPdDccKM?BKd?PchCDPD?sc?h',
-      'hSPhPCCsG?GSKccDHKCsHDcKKBMPDHBsKCdHDhDHMcMDHsP????c?cPdPHhddcdhPKshCsKdGG?MM?GBMBhCBsBccGd',
+      'BBBsscsMMMHsddssGHSP?hh??dddDccDKcKdsPPBBcBKKCChhC????dKhMhhHsscGGDMMddccPPdPGsSccsccPhhhKDDGD',
+      'cddPssH??BdDCsPssMdDdcKhKhhhKhCDKssshhPP?CdDGMcWcsWM?cKSKcCGK???WPMBhBhBhhhddKdPHcGSGPcccBKMccsss',
+      'BMGMM????BKhhSdPsPMsGssKKDPPhSPcccDcsHCssh???WhhWKdCdcdDdHsGPcHBKBdsdccWDMhchhhChccsccDKPGdGddCBMs',
+      'ccKs???BcKBshsMMPhGchhcWPW?CKssBsKWscGddsMccPssHPPcGdccKHKsssdCDMhBBcdBdCMhddKG???GdDdMDSDDhDPhSdh',
+      'KsssdhhhcccMccc???DGKCddMKKssCBHPdcddBPCCchcDBPPDKhKhssSchdhBsPccMGBHGHGPSB????DsMMhdsssdddhKhs',
     ].map(parseStrip),
-    revealWeights: [14, 14, 13, 13, 9, 9, 8, 8, 5, 4, 2, 1],
+    revealWeights: [143, 125, 116, 109, 90, 76, 65, 65, 58, 56, 52, 45],
   },
   free: {
     strips: [
-      '?KDscPdPDG?BcKM?BcdhBGKcGHBGDHMsDcBKdH?MKdscShhDC?HHdsPDChDsKBh?Ph?dGsHchMHMDGsBsCdMKdcP',
-      'PKDMhKMsHBHDCcsCdHBKHGKsGCWhcPcHHcP?BB???cPWKcs?BDMDhWdMDKBGKWMd?PhPssDMCGcsCdMdhGP?hhCddGDS',
-      'dsBDchGGCGssGdBCCWHMChccdDcH?KPBhDsPM?hBHB?cd?KWKdsMGPDM?GsHsdWDC?PKHShMWHMcBchKPKssW?DCd?P',
-      'KDWBchGH?MMsdDKWPGScMHCcChDHW?BcKd?sGGdBMdPCchsPCdWB??sKKDGDhPdPGPc?ds?cMsMCKGKshHsMDhchBPD',
-      'CPsScBKKGB????hDcDD?HHhhCMcsHCdCssGDCDdDhKBKMsPMKMMKhccPcPHHGHPdsdhddc???BBcBcMcP',
+      'Dd??BhGhKBKsBsCPGdDhdcPcPsC?PPshKsCDcsPMdsCBSBhDcHHsDHdh?cD?M?McdGdM?B?KcGMchGsC?KKHKPchM',
+      'PPhBKc??ccPchssd??GCPDssB?MCCKdDPsGhdWCMBhPWGBdBhdcWKKHcKGKPhKMdHMMGSHGsBDcD??DDs?dshM?cHhsW',
+      'chSKdBsBCdMMHhs?MB?dhhchsHK?GhCcHHDcG?KPDD??KdscGGP?sKhPMCChWKMccBMPD?WPsK?KWddPsWPcGsDGBdWDd',
+      'dDDDdPPssKddPcHCdBWPcKKKBBWGssCKKDhh????dPW??MBShhMMcBBhcccPKHcchhhDD??Wc?GGMMGGGMdCsssHHsdPCC',
+      'KKKccdGddhhhc?ccPPDDPPPMBKPCKssGCC???MBBKsssddMPshhCHccHddGGGHh?CMMDDMBBcSdBsMsssDhh????',
     ].map(parseStrip),
-    revealWeights: [10, 10, 10, 10, 10, 10, 9, 9, 8, 6, 5, 3],
+    revealWeights: [114, 113, 102, 97, 97, 92, 86, 80, 79, 64, 46, 30],
   },
 };
 

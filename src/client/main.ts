@@ -9,6 +9,8 @@
  *   jur=intl|uk|de   demo only: which jurisdiction profile to apply
  *   seed=<n>         demo only: deterministic RNG for QA
  */
+// Lets the renderer run under a strict Content-Security-Policy (no eval).
+import 'pixi.js/unsafe-eval';
 import '@fontsource/cinzel/latin-700.css';
 import '@fontsource/cinzel/latin-900.css';
 import '@fontsource/inter/latin-400.css';

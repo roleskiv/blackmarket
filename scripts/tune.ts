@@ -31,21 +31,21 @@ const from = arg('from');
 function initialModel(): MathModel {
   const runs = (sym: number, heights: number[]): Array<[number, number]> => heights.map((h) => [sym, h]);
   const baseReel = (r: number): Array<[number, number]> => [
-    ...runs(0, [1, 1, 2, 2, 3]),
-    ...runs(1, [1, 1, 2, 2, 3]),
-    ...runs(2, [1, 1, 2, 2, 3]),
-    ...runs(3, [1, 1, 2, 2, 3]),
+    ...runs(0, [1, 1, 2, 2, 3, 3]),
+    ...runs(1, [1, 1, 2, 2, 3, 3]),
+    ...runs(2, [1, 1, 2, 2, 2, 3]),
+    ...runs(3, [1, 1, 2, 2, 2, 3]),
     ...runs(4, [1, 1, 2, 3]),
     ...runs(5, [1, 1, 2, 3]),
     ...runs(6, [1, 1, 2, 2]),
     ...runs(7, [1, 1, 2, 2]),
-    ...runs(8, [1, 1, 2, 2]),
-    ...runs(9, [1, 2, 2]),
-    ...runs(10, [1, 1, 2]),
+    ...runs(8, [1, 2, 2]),
+    ...runs(9, [1, 1, 2]),
+    ...runs(10, [1, 2]),
     ...runs(11, [1, 2]),
     ...(r >= 1 && r <= 3 ? runs(WILD, [1, 1, 1]) : []),
     ...runs(SCATTER, [1, 1]),
-    ...runs(CRATE, [3, 4]),
+    ...runs(CRATE, [3,4]),
   ];
   const freeReel = (r: number): Array<[number, number]> => [
     ...runs(0, [1, 2, 2, 3]),
@@ -56,13 +56,13 @@ function initialModel(): MathModel {
     ...runs(5, [1, 1, 2, 3]),
     ...runs(6, [1, 1, 2, 2]),
     ...runs(7, [1, 1, 2, 2]),
-    ...runs(8, [1, 2, 2, 3]),
+    ...runs(8, [1, 2, 3]),
     ...runs(9, [1, 2, 3]),
     ...runs(10, [1, 2, 2]),
-    ...runs(11, [1, 2, 2]),
-    ...(r >= 1 && r <= 3 ? runs(WILD, [1, 1, 1, 1]) : []),
+    ...runs(11, [1, 1, 2]),
+    ...(r >= 1 && r <= 3 ? runs(WILD, [1,1,1,1]) : []),
     ...runs(SCATTER, [1]),
-    ...runs(CRATE, [3, 4]),
+    ...runs(CRATE, [2, 3, 4]),
   ];
   return {
     id,
@@ -71,11 +71,11 @@ function initialModel(): MathModel {
     ...SHARED_RULES,
     base: {
       strips: [0, 1, 2, 3, 4].map((r) => arrangeBlocks(baseReel(r), rulesFor('base', r), seed * 100 + r)),
-      revealWeights: [14, 14, 13, 13, 9, 9, 8, 8, 5, 4, 2, 1],
+      revealWeights: [140, 140, 130, 130, 90, 90, 80, 80, 50, 40, 20, 10],
     },
     free: {
       strips: [0, 1, 2, 3, 4].map((r) => arrangeBlocks(freeReel(r), rulesFor('free', r), seed * 100 + 50 + r)),
-      revealWeights: [10, 10, 10, 10, 10, 10, 9, 9, 8, 6, 5, 3],
+      revealWeights: [100, 100, 100, 100, 100, 100, 90, 90, 80, 60, 50, 30],
     },
   };
 }
@@ -98,7 +98,7 @@ interface Metrics {
 }
 
 const TARGETS = {
-  hit: 0.285,
+  hit: 0.30,
   trigger: 1 / 215,
   waysShare: 0.615,
   fsSpins: 12.6,
@@ -142,6 +142,11 @@ function shapePenalty(model: MathModel): number {
       if (sc < sl) p += (sl - sc) * 2;
       if (sc > sh) p += (sc - sh) * 2;
     });
+  }
+  // Crates should reveal cheap symbols at least as often as dear ones.
+  for (const mode of [model.base, model.free]) {
+    const w = mode.revealWeights;
+    for (let a = 0; a < 11; a++) if (w[a] < w[a + 1]) p += ((w[a + 1] - w[a]) / w[a + 1]) * 3;
   }
   return p;
 }
@@ -200,7 +205,7 @@ class Evaluator {
     return (
       2e6 * rel(x.rtp, target) +
       6e5 * rel(x.buyRtp, target) +
-      60 * rel(x.hit, TARGETS.hit) +
+      3000 * rel(x.hit, TARGETS.hit) +
       60 * rel(x.trigger, TARGETS.trigger) +
       80 * rel(x.waysShare, TARGETS.waysShare) +
       30 * rel(x.fsSpins, TARGETS.fsSpins) +
@@ -232,9 +237,18 @@ function anneal(model: MathModel): MathModel {
     const strip = mode.strips[r];
     const saved = strip.slice();
     const syms = symbolsFor(kind, r);
-    const move = rng.nextInt(4);
+    const move = rng.nextInt(6);
     const i = rng.nextInt(strip.length);
-    if (move === 0) {
+    const savedWeights = mode.revealWeights.slice();
+    if (move >= 4) {
+      // Shift crate-reveal weight between two symbols (total stays constant).
+      const a = rng.nextInt(12);
+      const b = rng.nextInt(12);
+      const k = 1 + rng.nextInt(6);
+      if (a === b || mode.revealWeights[a] - k < 5) continue;
+      mode.revealWeights[a] -= k;
+      mode.revealWeights[b] += k;
+    } else if (move === 0) {
       strip[i] = syms[rng.nextInt(syms.length)];
     } else if (move === 1) {
       strip.splice(i, 0, syms[rng.nextInt(syms.length)]);
@@ -248,7 +262,7 @@ function anneal(model: MathModel): MathModel {
       mode.strips[r] = saved;
       continue;
     }
-    ev.refresh(kind, r <= 2);
+    ev.refresh(kind, move >= 4 || r <= 2);
     const c2 = ev.cost();
     const accept = c2 <= cost || rng.nextInt(1_000_000) / 1_000_000 < Math.exp((cost - c2) / temp);
     if (accept) {
@@ -259,7 +273,8 @@ function anneal(model: MathModel): MathModel {
       }
     } else {
       mode.strips[r] = saved;
-      ev.refresh(kind, r <= 2);
+      mode.revealWeights = savedWeights;
+      ev.refresh(kind, move >= 4 || r <= 2);
     }
     if (it % 2000 === 0) {
       const x = ev.metrics();

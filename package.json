@@ -3,7 +3,7 @@
   "private": true,
   "version": "2.0.0",
   "type": "module",
-  "description": "BLACK MARKET — 5x4, 1024-ways video slot: game client, certified-math-ready engine, reference RGS and math tooling",
+  "description": "BLACK MARKET — 5x4, 1024-ways video slot: game client, server-authoritative engine, reference RGS and math tooling",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -15,7 +15,7 @@
     "math:sim": "tsx scripts/simulate.ts",
     "math:tune": "tsx scripts/tune.ts",
     "art": "node scripts/render-art.mjs",
-    "e2e": "playwright test"
+    "e2e": "node scripts/e2e.mjs"
   },
   "dependencies": {
     "@fontsource/cinzel": "^5.2.0",
@@ -24,9 +24,10 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "playwright": "^1.63.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vite": "^6.0.0",
-    "vitest": "^3.0.0"
+    "vitest": "^5.1.0"
   }
 }
